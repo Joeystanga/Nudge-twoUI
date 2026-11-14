@@ -8,17 +8,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.RadioButtonChecked
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -51,7 +48,6 @@ import com.nudge.edge.model.EdgeOrientationMapper
 import com.nudge.edge.model.NudgeSettings
 import com.nudge.edge.model.PreviewTarget
 import com.nudge.edge.model.ScreenEdge
-import com.nudge.edge.ui.components.EdgePopStripOverlay
 import com.nudge.edge.ui.components.QuickVolumeModal
 import com.nudge.edge.ui.components.VolumeSliderHud
 import com.nudge.edge.ui.components.computeHudOuterSpanDp
@@ -61,7 +57,6 @@ private enum class SettingsTab(
     val label: String,
     val icon: ImageVector
 ) {
-    POP_SETUP("Pop Setup", Icons.Rounded.RadioButtonChecked),
     SLIDER_HUD("Slider HUD", Icons.AutoMirrored.Rounded.VolumeUp),
     SETTINGS("Settings", Icons.Rounded.Settings)
 }
@@ -83,7 +78,7 @@ fun MainScreen(
     showAccessibilityPrompt: Boolean = false,
     onDismissAccessibilityPrompt: () -> Unit = {}
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.POP_SETUP) }
+    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.SLIDER_HUD) }
     var localModalVisible by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -99,7 +94,6 @@ fun MainScreen(
         }
     }
 
-    val popScrollState = rememberScrollState()
     val hudScrollState = rememberScrollState()
     val systemScrollState = rememberScrollState()
     val portraitAxisDp = maxOf(realScreenWidthDp, realScreenHeightDp)
@@ -149,7 +143,6 @@ fun MainScreen(
                     musicMaxVolume = musicMaxVolume,
                     serviceActive = serviceActive,
                     repository = repository,
-                    popScrollState = popScrollState,
                     hudScrollState = hudScrollState,
                     systemScrollState = systemScrollState,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
@@ -196,7 +189,6 @@ fun MainScreen(
                     musicMaxVolume = musicMaxVolume,
                     serviceActive = serviceActive,
                     repository = repository,
-                    popScrollState = popScrollState,
                     hudScrollState = hudScrollState,
                     systemScrollState = systemScrollState,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
@@ -314,7 +306,6 @@ private fun SettingsCardPane(
     musicMaxVolume: Int,
     serviceActive: Boolean,
     repository: SettingsRepository,
-    popScrollState: androidx.compose.foundation.ScrollState,
     hudScrollState: androidx.compose.foundation.ScrollState,
     systemScrollState: androidx.compose.foundation.ScrollState,
     onOpenAccessibilitySettings: () -> Unit,
@@ -329,7 +320,6 @@ private fun SettingsCardPane(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             val activeScrollState = when (selectedTab) {
-                SettingsTab.POP_SETUP -> popScrollState
                 SettingsTab.SLIDER_HUD -> hudScrollState
                 SettingsTab.SETTINGS -> systemScrollState
             }
@@ -341,11 +331,6 @@ private fun SettingsCardPane(
                     .verticalScroll(activeScrollState)
             ) {
                 when (selectedTab) {
-                    SettingsTab.POP_SETUP -> PopSetupTab(
-                        settings = settings,
-                        portraitAxisDp = portraitAxisDp,
-                        repository = repository
-                    )
                     SettingsTab.SLIDER_HUD -> SliderHudTab(
                         settings = settings,
                         portraitAxisDp = portraitAxisDp,
@@ -406,61 +391,19 @@ private fun LocalFallbackEdgePreviewLayer(
     val hudSpanPx = ceil(with(density) { computeHudOuterSpanDp(settings.hudHeightDp).dp.toPx() }).toInt()
 
     val isLandscape = EdgeOrientationMapper.isLandscapeRotation(displayRotation)
-    val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
     val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, settings)
 
-    val popScreenEdge = EdgeOrientationMapper.resolvePhysicalEdge(
-        settings.popEdgeSide,
-        displayRotation
-    )
     val hudScreenEdge = EdgeOrientationMapper.resolveHudScreenEdge(
         settings = settings,
         rotation = displayRotation
     )
 
-    val showUp = popAllowed && (
-        previewTarget == PreviewTarget.POP_UP ||
-            previewTarget == PreviewTarget.POP_BOTH
-        )
-    val showDown = popAllowed && (
-        previewTarget == PreviewTarget.POP_DOWN ||
-            previewTarget == PreviewTarget.POP_BOTH
-        )
-    val showPower = popAllowed &&
-        settings.enablePowerButtonPop &&
-        previewTarget == PreviewTarget.POP_POWER
     val showHud = hudAllowed && previewTarget == PreviewTarget.HUD
 
-    val popAlignment = edgeBoxAlignment(popScreenEdge)
     val hudAlignment = edgeBoxAlignment(hudScreenEdge)
-    val popIsVertical = popScreenEdge == ScreenEdge.LEFT || popScreenEdge == ScreenEdge.RIGHT
     val hudIsVertical = hudScreenEdge == ScreenEdge.LEFT || hudScreenEdge == ScreenEdge.RIGHT
-    val popMaxBreadthDp = maxOf(settings.popWidthDp, settings.powerPopWidthDp) * 1.15f
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (popAllowed) {
-            val stripModifier = if (popIsVertical) {
-                Modifier
-                    .align(popAlignment)
-                    .width(popMaxBreadthDp.dp)
-                    .fillMaxHeight()
-            } else {
-                Modifier
-                    .align(popAlignment)
-                    .fillMaxWidth()
-                    .height(popMaxBreadthDp.dp)
-            }
-            EdgePopStripOverlay(
-                settings = settings,
-                screenEdge = popScreenEdge,
-                displayRotation = displayRotation,
-                upExpanded = showUp,
-                downExpanded = showDown,
-                powerExpanded = showPower,
-                modifier = stripModifier
-            )
-        }
-
         if (showHud) {
             val offset = if (hudIsVertical) {
                 val y = EdgeOrientationMapper.computeHudTopOrLeftPx(

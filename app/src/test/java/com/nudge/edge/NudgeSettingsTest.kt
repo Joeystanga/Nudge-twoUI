@@ -4,7 +4,6 @@ import android.view.Surface
 import com.nudge.edge.data.VolumeController
 import com.nudge.edge.model.EdgeOrientationMapper
 import com.nudge.edge.model.EdgeSide
-import com.nudge.edge.model.HudTriggerMode
 import com.nudge.edge.model.NudgeSettings
 import com.nudge.edge.model.ScreenEdge
 import com.nudge.edge.ui.components.HUD_CUTOUT_BEZEL_PAD_DP
@@ -24,57 +23,28 @@ class NudgeSettingsTest {
     @Test
     fun defaultsMatchSpecification() {
         val defaults = NudgeSettings()
-        assertEquals(EdgeSide.RIGHT, defaults.popEdgeSide)
-        assertEquals(14f, defaults.popWidthDp, 0.001f)
-        assertEquals(72f, defaults.popHeightDp, 0.001f)
+        assertEquals(EdgeSide.RIGHT, defaults.hudEdgeSide)
         assertEquals(155f, defaults.hudHeightDp, 0.001f)
         assertEquals(45f, defaults.hudWidthDp, 0.001f)
         assertEquals(15f, defaults.hudCornerRadiusDp, 0.001f)
         assertEquals(1800L, defaults.hudAutoHideMs)
-        assertEquals(HudTriggerMode.SIMULTANEOUS, defaults.hudTriggerMode)
         assertTrue(defaults.enableVolumeSliderHud)
         assertFalse(defaults.showSystemPanelWhenHudOff)
         assertEquals(7, defaults.volumeStep)
         assertFalse(defaults.floatingMode)
         assertEquals(0f, defaults.hudEdgeInsetDp, 0.001f)
-        assertTrue(defaults.enableEdgePopInLandscape)
         assertTrue(defaults.enableSliderHudInLandscape)
         assertEquals(ScreenEdge.RIGHT, defaults.landscapeHudEdgeSide)
         assertEquals(0.50f, defaults.landscapeHudYFraction, 0.001f)
         assertTrue(defaults.showSystemPanelInLandscape)
-        assertEquals(200L, defaults.popAutoHideMs)
-        assertTrue(defaults.enablePowerButtonPop)
-        assertEquals(0.50f, defaults.powerButtonYFraction, 0.001f)
-        assertEquals(14f, defaults.powerPopWidthDp, 0.001f)
-        assertEquals(72f, defaults.powerPopHeightDp, 0.001f)
-        assertTrue(defaults.hudSideSynced)
         assertTrue(defaults.hapticsEnabled)
         assertFalse(defaults.lightMode)
-    }
-
-    @Test
-    fun effectiveHudSideFollowsSyncSetting() {
-        val synced = NudgeSettings(
-            popEdgeSide = EdgeSide.LEFT,
-            hudSideSynced = true,
-            hudEdgeSide = EdgeSide.RIGHT
-        )
-        assertEquals(EdgeSide.LEFT, synced.effectiveHudEdgeSide)
-
-        val independent = synced.copy(hudSideSynced = false)
-        assertEquals(EdgeSide.RIGHT, independent.effectiveHudEdgeSide)
     }
 
     @Test
     fun clampingRespectsAllBounds() {
         assertEquals(0f, NudgeSettings.clampFraction(-0.4f), 0.0001f)
         assertEquals(1f, NudgeSettings.clampFraction(1.4f), 0.0001f)
-        assertEquals(4f, NudgeSettings.clampPopWidth(1f), 0.001f)
-        assertEquals(40f, NudgeSettings.clampPopWidth(60f), 0.001f)
-        assertEquals(24f, NudgeSettings.clampPopHeight(10f), 0.001f)
-        assertEquals(180f, NudgeSettings.clampPopHeight(240f), 0.001f)
-        assertEquals(100L, NudgeSettings.clampPopAutoHideMs(20L))
-        assertEquals(1500L, NudgeSettings.clampPopAutoHideMs(5000L))
         assertEquals(1, NudgeSettings.clampVolumeStep(0))
         assertEquals(10, NudgeSettings.clampVolumeStep(25))
         assertEquals(100f, NudgeSettings.clampHudHeight(50f), 0.001f)
@@ -138,7 +108,6 @@ class NudgeSettingsTest {
     @Test
     fun landscapeAndSystemPanelFallbackRulesWorkCorrectly() {
         val bothOffWithSystemPanel = NudgeSettings(
-            enableEdgePopInLandscape = false,
             enableSliderHudInLandscape = false,
             showSystemPanelInLandscape = true
         )
@@ -146,22 +115,11 @@ class NudgeSettingsTest {
         assertTrue(EdgeOrientationMapper.shouldShowSystemVolumePanel(isLandscape = true, bothOffWithSystemPanel))
 
         val bothOffSilent = NudgeSettings(
-            enableEdgePopInLandscape = false,
             enableSliderHudInLandscape = false,
             showSystemPanelInLandscape = false
         )
         assertTrue(EdgeOrientationMapper.shouldConsumeVolumeKey(isLandscape = true, bothOffSilent))
         assertFalse(EdgeOrientationMapper.shouldShowSystemVolumePanel(isLandscape = true, bothOffSilent))
-
-        val popOnlyShowSystem = NudgeSettings(
-            enableEdgePopInLandscape = true,
-            enableSliderHudInLandscape = false,
-            showSystemPanelInLandscape = true
-        )
-        assertTrue(EdgeOrientationMapper.shouldConsumeVolumeKey(isLandscape = true, popOnlyShowSystem))
-        assertTrue(EdgeOrientationMapper.shouldShowEdgePop(isLandscape = true, popOnlyShowSystem))
-        assertFalse(EdgeOrientationMapper.shouldShowSliderHud(isLandscape = true, popOnlyShowSystem))
-        assertTrue(EdgeOrientationMapper.shouldShowSystemVolumePanel(isLandscape = true, popOnlyShowSystem))
 
         val hudOffPortraitSilent = NudgeSettings(
             enableVolumeSliderHud = false,
@@ -184,8 +142,8 @@ class NudgeSettingsTest {
         assertEquals(0.75f, EdgeOrientationMapper.resolveAxisFraction(0.25f, Surface.ROTATION_270), 0.0001f)
         assertEquals(0.75f, EdgeOrientationMapper.resolveAxisFraction(0.25f, Surface.ROTATION_180), 0.0001f)
 
-        val xPos = EdgeOrientationMapper.computeElementTopOrLeftPx(
-            portraitYFraction = 0.25f,
+        val xPos = EdgeOrientationMapper.computeHudTopOrLeftPx(
+            settings = NudgeSettings(landscapeHudYFraction = 0.25f),
             rotation = Surface.ROTATION_90,
             axisLengthPx = 2000f,
             elementSpanPx = 100

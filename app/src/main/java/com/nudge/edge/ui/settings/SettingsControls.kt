@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,17 +20,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.LightMode
-import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -45,356 +41,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nudge.edge.data.SettingsRepository
 import com.nudge.edge.model.EdgeSide
-import com.nudge.edge.model.HudTriggerMode
 import com.nudge.edge.model.NudgeSettings
 import com.nudge.edge.model.ScreenEdge
 import java.util.Locale
 import kotlin.math.roundToInt
-
-@Composable
-fun PopSetupTab(
-    settings: NudgeSettings,
-    portraitAxisDp: Float,
-    repository: SettingsRepository
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        EdgeSideSelectorCard(
-            title = "Portrait Edge Side",
-            subtitle = "Matches your hardware button side",
-            selectedSide = settings.popEdgeSide,
-            onSideSelected = repository::setPopEdgeSide
-        )
-
-        StepperSliderCard(
-            title = "Volume Up Y-Axis",
-            valueLabel = formatYAxisLabel(settings.volumeUpYFraction, portraitAxisDp),
-            value = settings.volumeUpYFraction,
-            valueRange = 0f..1f,
-            onValueChange = repository::setVolumeUpYFraction,
-            onStepDown = {
-                repository.setVolumeUpYFraction(
-                    NudgeSettings.stepFractionByDp(
-                        settings.volumeUpYFraction,
-                        -1f,
-                        portraitAxisDp
-                    )
-                )
-            },
-            onStepUp = {
-                repository.setVolumeUpYFraction(
-                    NudgeSettings.stepFractionByDp(
-                        settings.volumeUpYFraction,
-                        1f,
-                        portraitAxisDp
-                    )
-                )
-            },
-            stepDescription = "1 dp step"
-        )
-
-        StepperSliderCard(
-            title = "Volume Down Y-Axis",
-            valueLabel = formatYAxisLabel(settings.volumeDownYFraction, portraitAxisDp),
-            value = settings.volumeDownYFraction,
-            valueRange = 0f..1f,
-            onValueChange = repository::setVolumeDownYFraction,
-            onStepDown = {
-                repository.setVolumeDownYFraction(
-                    NudgeSettings.stepFractionByDp(
-                        settings.volumeDownYFraction,
-                        -1f,
-                        portraitAxisDp
-                    )
-                )
-            },
-            onStepUp = {
-                repository.setVolumeDownYFraction(
-                    NudgeSettings.stepFractionByDp(
-                        settings.volumeDownYFraction,
-                        1f,
-                        portraitAxisDp
-                    )
-                )
-            },
-            stepDescription = "1 dp step"
-        )
-
-        StepperSliderCard(
-            title = "Volume Pop Width",
-            valueLabel = "${settings.popWidthDp.roundToInt()} dp",
-            value = settings.popWidthDp,
-            valueRange = NudgeSettings.MIN_POP_WIDTH_DP..NudgeSettings.MAX_POP_WIDTH_DP,
-            onValueChange = { repository.setPopWidthDp(it.roundToInt().toFloat()) },
-            onStepDown = { repository.setPopWidthDp(settings.popWidthDp - 1f) },
-            onStepUp = { repository.setPopWidthDp(settings.popWidthDp + 1f) },
-            stepDescription = "1 dp step"
-        )
-
-        StepperSliderCard(
-            title = "Volume Pop Height",
-            valueLabel = "${settings.popHeightDp.roundToInt()} dp",
-            value = settings.popHeightDp,
-            valueRange = NudgeSettings.MIN_POP_HEIGHT_DP..NudgeSettings.MAX_POP_HEIGHT_DP,
-            onValueChange = { repository.setPopHeightDp(it.roundToInt().toFloat()) },
-            onStepDown = { repository.setPopHeightDp(settings.popHeightDp - 1f) },
-            onStepUp = { repository.setPopHeightDp(settings.popHeightDp + 1f) },
-            stepDescription = "1 dp step"
-        )
-
-        StepperSliderCard(
-            title = "Edge Pop Timeout",
-            valueLabel = formatTimeoutLabel(settings.popAutoHideMs),
-            value = settings.popAutoHideMs.toFloat(),
-            valueRange = NudgeSettings.MIN_POP_AUTO_HIDE_MS.toFloat()..NudgeSettings.MAX_POP_AUTO_HIDE_MS.toFloat(),
-            onValueChange = { raw ->
-                val snapped = ((raw / NudgeSettings.POP_AUTO_HIDE_STEP_MS.toFloat()).roundToInt() *
-                    NudgeSettings.POP_AUTO_HIDE_STEP_MS)
-                repository.setPopAutoHideMs(snapped)
-            },
-            onStepDown = {
-                repository.setPopAutoHideMs(
-                    settings.popAutoHideMs - NudgeSettings.POP_AUTO_HIDE_STEP_MS
-                )
-            },
-            onStepUp = {
-                repository.setPopAutoHideMs(
-                    settings.popAutoHideMs + NudgeSettings.POP_AUTO_HIDE_STEP_MS
-                )
-            },
-            stepDescription = "50 ms step"
-        )
-
-        PowerButtonPopCard(
-            settings = settings,
-            portraitAxisDp = portraitAxisDp,
-            repository = repository
-        )
-
-        OrientationSettingsCard(
-            settings = settings,
-            repository = repository
-        )
-    }
-}
-
-@Composable
-private fun PowerButtonPopCard(
-    settings: NudgeSettings,
-    portraitAxisDp: Float,
-    repository: SettingsRepository
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PowerSettingsNew,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Power Button Pop",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                onClick = { repository.setEnablePowerButtonPop(!settings.enablePowerButtonPop) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Enable Power Button Pop",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Triggers pop on power press or wake",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Switch(
-                        checked = settings.enablePowerButtonPop,
-                        onCheckedChange = repository::setEnablePowerButtonPop
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = settings.enablePowerButtonPop,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-
-                    InlineStepperSlider(
-                        title = "Power Button Y-Axis",
-                        valueLabel = formatYAxisLabel(settings.powerButtonYFraction, portraitAxisDp),
-                        value = settings.powerButtonYFraction,
-                        valueRange = 0f..1f,
-                        onValueChange = repository::setPowerButtonYFraction,
-                        onStepDown = {
-                            repository.setPowerButtonYFraction(
-                                NudgeSettings.stepFractionByDp(
-                                    settings.powerButtonYFraction,
-                                    -1f,
-                                    portraitAxisDp
-                                )
-                            )
-                        },
-                        onStepUp = {
-                            repository.setPowerButtonYFraction(
-                                NudgeSettings.stepFractionByDp(
-                                    settings.powerButtonYFraction,
-                                    1f,
-                                    portraitAxisDp
-                                )
-                            )
-                        }
-                    )
-
-                    InlineStepperSlider(
-                        title = "Power Pop Width",
-                        valueLabel = "${settings.powerPopWidthDp.roundToInt()} dp",
-                        value = settings.powerPopWidthDp,
-                        valueRange = NudgeSettings.MIN_POP_WIDTH_DP..NudgeSettings.MAX_POP_WIDTH_DP,
-                        onValueChange = {
-                            repository.setPowerPopWidthDp(it.roundToInt().toFloat())
-                        },
-                        onStepDown = {
-                            repository.setPowerPopWidthDp(settings.powerPopWidthDp - 1f)
-                        },
-                        onStepUp = {
-                            repository.setPowerPopWidthDp(settings.powerPopWidthDp + 1f)
-                        }
-                    )
-
-                    InlineStepperSlider(
-                        title = "Power Pop Height",
-                        valueLabel = "${settings.powerPopHeightDp.roundToInt()} dp",
-                        value = settings.powerPopHeightDp,
-                        valueRange = NudgeSettings.MIN_POP_HEIGHT_DP..NudgeSettings.MAX_POP_HEIGHT_DP,
-                        onValueChange = {
-                            repository.setPowerPopHeightDp(it.roundToInt().toFloat())
-                        },
-                        onStepDown = {
-                            repository.setPowerPopHeightDp(settings.powerPopHeightDp - 1f)
-                        },
-                        onStepUp = {
-                            repository.setPowerPopHeightDp(settings.powerPopHeightDp + 1f)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OrientationSettingsCard(
-    settings: NudgeSettings,
-    repository: SettingsRepository
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.ScreenRotation,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = "Orientation Settings",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                onClick = {
-                    repository.setEnableEdgePopInLandscape(!settings.enableEdgePopInLandscape)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Show Edge Pop in Landscape",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Switch(
-                        checked = settings.enableEdgePopInLandscape,
-                        onCheckedChange = repository::setEnableEdgePopInLandscape
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun SliderHudTab(
@@ -493,52 +143,26 @@ fun SliderHudTab(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "HUD Edge Anchor",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = if (settings.hudSideSynced) {
-                                        "Synced (${settings.popEdgeSide.name.lowercase().replaceFirstChar { it.uppercase() }})"
-                                    } else {
-                                        "Independent edge anchor"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "Sync",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                                Switch(
-                                    checked = settings.hudSideSynced,
-                                    onCheckedChange = repository::setHudSideSynced
-                                )
-                            }
+                        Column {
+                            Text(
+                                text = "HUD Edge Anchor",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Screen edge for the volume slider",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                         EdgeSideSegmentedButtons(
-                            selectedSide = settings.effectiveHudEdgeSide,
+                            selectedSide = settings.hudEdgeSide,
                             onSideSelected = repository::setHudEdgeSide
                         )
                     }
@@ -677,11 +301,6 @@ fun SliderHudTab(
                         repository.setHudCornerRadiusDp(minOf(effectiveCornerDp + 1f, maxCornerDp))
                     },
                     stepDescription = "0 to ${maxCornerDp.roundToInt()} dp (1 dp step)"
-                )
-
-                TriggerModeSelectorCard(
-                    selectedMode = settings.hudTriggerMode,
-                    onModeSelected = repository::setHudTriggerMode
                 )
 
                 StepperSliderCard(
@@ -1133,48 +752,6 @@ fun SystemTab(
 }
 
 @Composable
-private fun EdgeSideSelectorCard(
-    title: String,
-    subtitle: String,
-    selectedSide: EdgeSide,
-    onSideSelected: (EdgeSide) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            EdgeSideSegmentedButtons(
-                selectedSide = selectedSide,
-                onSideSelected = onSideSelected
-            )
-        }
-    }
-}
-
-@Composable
 private fun EdgeSideSegmentedButtons(
     selectedSide: EdgeSide,
     onSideSelected: (EdgeSide) -> Unit
@@ -1255,98 +832,6 @@ private fun SelectablePillButton(
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 10.dp)
         )
-    }
-}
-
-@Composable
-private fun TriggerModeSelectorCard(
-    selectedMode: HudTriggerMode,
-    onModeSelected: (HudTriggerMode) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "HUD Trigger Mode",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            TriggerOptionRow(
-                selected = selectedMode == HudTriggerMode.SIMULTANEOUS,
-                title = "Simultaneous with Edge Pop",
-                description = "Show slider HUD immediately",
-                onClick = { onModeSelected(HudTriggerMode.SIMULTANEOUS) }
-            )
-            TriggerOptionRow(
-                selected = selectedMode == HudTriggerMode.SECOND_PRESS,
-                title = "Second Press",
-                description = "First press pops; second opens HUD",
-                onClick = { onModeSelected(HudTriggerMode.SECOND_PRESS) }
-            )
-            TriggerOptionRow(
-                selected = selectedMode == HudTriggerMode.SWIPE_FROM_POP,
-                title = "Swipe Inward from Edge Pop",
-                description = "Press for Edge Pop, swipe in for HUD",
-                onClick = { onModeSelected(HudTriggerMode.SWIPE_FROM_POP) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun TriggerOptionRow(
-    selected: Boolean,
-    title: String,
-    description: String,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RadioButton(
-                selected = selected,
-                onClick = onClick
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
 

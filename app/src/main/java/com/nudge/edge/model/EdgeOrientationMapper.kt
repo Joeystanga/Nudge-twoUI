@@ -30,7 +30,7 @@ object EdgeOrientationMapper {
         return if (isLandscapeRotation(rotation)) {
             settings.landscapeHudEdgeSide
         } else {
-            resolvePhysicalEdge(settings.effectiveHudEdgeSide, rotation)
+            resolvePhysicalEdge(settings.hudEdgeSide, rotation)
         }
     }
 
@@ -51,30 +51,6 @@ object EdgeOrientationMapper {
         }
     }
 
-    fun computeElementCenterPx(
-        portraitYFraction: Float,
-        rotation: Int,
-        axisLengthPx: Float
-    ): Float {
-        val baseFraction = resolveAxisFraction(portraitYFraction, rotation)
-        return (baseFraction * axisLengthPx).coerceIn(0f, axisLengthPx)
-    }
-
-    fun computeElementTopOrLeftPx(
-        portraitYFraction: Float,
-        rotation: Int,
-        axisLengthPx: Float,
-        elementSpanPx: Int
-    ): Int {
-        val centerPx = computeElementCenterPx(
-            portraitYFraction = portraitYFraction,
-            rotation = rotation,
-            axisLengthPx = axisLengthPx
-        ).roundToInt()
-        val maxOffset = (axisLengthPx.roundToInt() - elementSpanPx).coerceAtLeast(0)
-        return (centerPx - elementSpanPx / 2).coerceIn(0, maxOffset)
-    }
-
     fun computeHudTopOrLeftPx(
         settings: NudgeSettings,
         rotation: Int,
@@ -85,10 +61,6 @@ object EdgeOrientationMapper {
         val centerPx = (fraction * axisLengthPx).coerceIn(0f, axisLengthPx).roundToInt()
         val maxOffset = (axisLengthPx.roundToInt() - elementSpanPx).coerceAtLeast(0)
         return (centerPx - elementSpanPx / 2).coerceIn(0, maxOffset)
-    }
-
-    fun shouldShowEdgePop(isLandscape: Boolean, settings: NudgeSettings): Boolean {
-        return !isLandscape || settings.enableEdgePopInLandscape
     }
 
     fun shouldShowSliderHud(isLandscape: Boolean, settings: NudgeSettings): Boolean {
@@ -111,9 +83,7 @@ object EdgeOrientationMapper {
 
     fun shouldConsumeVolumeKey(isLandscape: Boolean, settings: NudgeSettings): Boolean {
         if (!isLandscape) return true
-        val popShown = shouldShowEdgePop(true, settings)
-        val hudShown = shouldShowSliderHud(true, settings)
-        if (!popShown && !hudShown) {
+        if (!shouldShowSliderHud(true, settings)) {
             return !shouldShowSystemVolumePanel(true, settings)
         }
         return true

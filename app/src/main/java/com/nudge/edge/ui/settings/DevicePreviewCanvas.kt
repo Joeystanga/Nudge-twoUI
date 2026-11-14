@@ -56,15 +56,11 @@ import com.nudge.edge.ui.components.HUD_CUTOUT_BEZEL_PAD_DP
 import com.nudge.edge.ui.components.HUD_CUTOUT_FILLET_TAIL_DP
 import com.nudge.edge.ui.components.HUD_CUTOUT_INNER_PAD_DP
 import com.nudge.edge.ui.components.HUD_CUTOUT_PILL_START_OFFSET_DP
-import com.nudge.edge.ui.components.buildEdgePopPath
 import com.nudge.edge.ui.components.buildHudHousingPath
-import com.nudge.edge.ui.components.buildMergedEdgePopPath
 import com.nudge.edge.ui.components.computeHudCutoutThicknessDp
 import com.nudge.edge.ui.components.computeHudDrawnPillSpanDp
 import com.nudge.edge.ui.components.computeHudOuterSpanDp
 import com.nudge.edge.ui.components.drawSpeakerGlyph
-import kotlin.math.abs
-import kotlin.math.hypot
 
 @Composable
 fun DevicePreviewHeader(
@@ -159,15 +155,9 @@ fun DevicePreviewCanvas(
     val screenBottomColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
     val frameStrokeColor = MaterialTheme.colorScheme.outline
     val activeAccent = MaterialTheme.colorScheme.primary
-    val secondaryAccent = MaterialTheme.colorScheme.tertiary
 
     val isLandscape = EdgeOrientationMapper.isLandscapeRotation(displayRotation)
-    val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
     val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, settings)
-    val popScreenEdge = EdgeOrientationMapper.resolvePhysicalEdge(
-        settings.popEdgeSide,
-        displayRotation
-    )
     val hudScreenEdge = EdgeOrientationMapper.resolveHudScreenEdge(
         settings = settings,
         rotation = displayRotation
@@ -184,7 +174,6 @@ fun DevicePreviewCanvas(
         label = "previewInsetDp"
     )
 
-    val popPath = remember { Path() }
     val hudPath = remember { Path() }
     val pillPath = remember { Path() }
     val speakerPath = remember { Path() }
@@ -206,44 +195,9 @@ fun DevicePreviewCanvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(settings, realScreenWidthDp, realScreenHeightDp, displayRotation) {
-                        detectTapGestures { offset ->
-                            val tapX = (offset.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
-                            val tapY = (offset.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                            val hudFraction = EdgeOrientationMapper.resolveHudAxisFraction(
-                                settings = settings,
-                                rotation = displayRotation
-                            )
-                            val (hx, hy) = previewEdgePoint(hudScreenEdge, hudFraction)
-                            val upPos = EdgeOrientationMapper.resolveAxisFraction(
-                                settings.volumeUpYFraction,
-                                displayRotation
-                            )
-                            val downPos = EdgeOrientationMapper.resolveAxisFraction(
-                                settings.volumeDownYFraction,
-                                displayRotation
-                            )
-                            val powerPos = EdgeOrientationMapper.resolveAxisFraction(
-                                settings.powerButtonYFraction,
-                                displayRotation
-                            )
-                            val (ux, uy) = previewEdgePoint(popScreenEdge, upPos)
-                            val (dx, dy) = previewEdgePoint(popScreenEdge, downPos)
-                            val (px, py) = previewEdgePoint(popScreenEdge, powerPos)
-                            val candidates = buildList {
-                                if (hudAllowed) {
-                                    add(PreviewTarget.HUD to hypot(tapX - hx, tapY - hy))
-                                }
-                                if (popAllowed) {
-                                    add(PreviewTarget.POP_UP to hypot(tapX - ux, tapY - uy))
-                                    add(PreviewTarget.POP_DOWN to hypot(tapX - dx, tapY - dy))
-                                    if (settings.enablePowerButtonPop) {
-                                        add(PreviewTarget.POP_POWER to hypot(tapX - px, tapY - py))
-                                    }
-                                }
-                            }
-                            val target = candidates.minByOrNull { it.second }?.first ?: PreviewTarget.NONE
-                            if (target != PreviewTarget.NONE) {
-                                onPreviewTap(target)
+                        detectTapGestures {
+                            if (hudAllowed) {
+                                onPreviewTap(PreviewTarget.HUD)
                             }
                         }
                     }
@@ -267,97 +221,7 @@ fun DevicePreviewCanvas(
                     cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx)
                 )
 
-                val popIsVertical = popScreenEdge == ScreenEdge.LEFT ||
-                    popScreenEdge == ScreenEdge.RIGHT
-                val popAxisLen = if (popIsVertical) size.height else size.width
-                val popSpreadPx = settings.popHeightDp * scale
-                val popProtrusionPx = settings.popWidthDp * scale
-
-                val upCenterPx = computePreviewCenter(
-                    portraitFraction = settings.volumeUpYFraction,
-                    rotation = displayRotation,
-                    axisLengthPx = popAxisLen,
-                    elementSpanPx = popSpreadPx
-                )
-                val downCenterPx = computePreviewCenter(
-                    portraitFraction = settings.volumeDownYFraction,
-                    rotation = displayRotation,
-                    axisLengthPx = popAxisLen,
-                    elementSpanPx = popSpreadPx
-                )
-                val powerSpreadPx = settings.powerPopHeightDp * scale
-                val powerProtrusionPx = settings.powerPopWidthDp * scale
-                val powerCenterPx = computePreviewCenter(
-                    portraitFraction = settings.powerButtonYFraction,
-                    rotation = displayRotation,
-                    axisLengthPx = popAxisLen,
-                    elementSpanPx = powerSpreadPx
-                )
-
                 clipPath(screenClipPath) {
-                    if (popAllowed) {
-                        val popDelta = abs(upCenterPx - downCenterPx)
-                        val shouldShowMerged = previewTarget == PreviewTarget.POP_BOTH &&
-                            popDelta < popSpreadPx * 2f
-
-                        if (shouldShowMerged) {
-                            buildMergedEdgePopPath(
-                                path = popPath,
-                                canvasWidth = size.width,
-                                canvasHeight = size.height,
-                                firstCenterPx = upCenterPx,
-                                secondCenterPx = downCenterPx,
-                                spreadPx = popSpreadPx,
-                                firstProtrusionPx = popProtrusionPx,
-                                secondProtrusionPx = popProtrusionPx,
-                                screenEdge = popScreenEdge
-                            )
-                            drawPath(path = popPath, color = Color.Black)
-                        } else {
-                            drawPreviewPop(
-                                popPath = popPath,
-                                canvasWidth = size.width,
-                                canvasHeight = size.height,
-                                centerPx = upCenterPx,
-                                spreadPx = popSpreadPx,
-                                protrusionPx = popProtrusionPx,
-                                screenEdge = popScreenEdge,
-                                highlight = previewTarget == PreviewTarget.POP_UP ||
-                                    previewTarget == PreviewTarget.POP_BOTH,
-                                accent = activeAccent,
-                                strokeWidth = 1.6.dp.toPx()
-                            )
-                            drawPreviewPop(
-                                popPath = popPath,
-                                canvasWidth = size.width,
-                                canvasHeight = size.height,
-                                centerPx = downCenterPx,
-                                spreadPx = popSpreadPx,
-                                protrusionPx = popProtrusionPx,
-                                screenEdge = popScreenEdge,
-                                highlight = previewTarget == PreviewTarget.POP_DOWN ||
-                                    previewTarget == PreviewTarget.POP_BOTH,
-                                accent = activeAccent,
-                                strokeWidth = 1.6.dp.toPx()
-                            )
-                        }
-
-                        if (settings.enablePowerButtonPop) {
-                            drawPreviewPop(
-                                popPath = popPath,
-                                canvasWidth = size.width,
-                                canvasHeight = size.height,
-                                centerPx = powerCenterPx,
-                                spreadPx = powerSpreadPx,
-                                protrusionPx = powerProtrusionPx,
-                                screenEdge = popScreenEdge,
-                                highlight = previewTarget == PreviewTarget.POP_POWER,
-                                accent = secondaryAccent,
-                                strokeWidth = 1.6.dp.toPx()
-                            )
-                        }
-                    }
-
                     if (hudAllowed) {
                         val hudIsVertical = hudScreenEdge == ScreenEdge.LEFT ||
                             hudScreenEdge == ScreenEdge.RIGHT
@@ -560,66 +424,6 @@ fun DevicePreviewCanvas(
                     style = Stroke(width = bezelStrokePx)
                 )
 
-                val markerColor = activeAccent.copy(alpha = 0.75f)
-                val powerMarkerColor = secondaryAccent.copy(alpha = 0.85f)
-                val markerThick = 3.dp.toPx()
-                if (popIsVertical) {
-                    val markerX = if (popScreenEdge == ScreenEdge.RIGHT) {
-                        size.width + 4.dp.toPx()
-                    } else {
-                        -7.dp.toPx()
-                    }
-                    val markerH = (popSpreadPx * 0.48f).coerceAtLeast(6.dp.toPx())
-                    drawRoundRect(
-                        color = markerColor,
-                        topLeft = Offset(markerX, upCenterPx - markerH * 0.5f),
-                        size = Size(markerThick, markerH),
-                        cornerRadius = CornerRadius(markerThick, markerThick)
-                    )
-                    drawRoundRect(
-                        color = markerColor,
-                        topLeft = Offset(markerX, downCenterPx - markerH * 0.5f),
-                        size = Size(markerThick, markerH),
-                        cornerRadius = CornerRadius(markerThick, markerThick)
-                    )
-                    if (settings.enablePowerButtonPop) {
-                        val pMarkerH = (powerSpreadPx * 0.48f).coerceAtLeast(6.dp.toPx())
-                        drawRoundRect(
-                            color = powerMarkerColor,
-                            topLeft = Offset(markerX, powerCenterPx - pMarkerH * 0.5f),
-                            size = Size(markerThick, pMarkerH),
-                            cornerRadius = CornerRadius(markerThick, markerThick)
-                        )
-                    }
-                } else {
-                    val markerY = if (popScreenEdge == ScreenEdge.BOTTOM) {
-                        size.height + 4.dp.toPx()
-                    } else {
-                        -7.dp.toPx()
-                    }
-                    val markerW = (popSpreadPx * 0.48f).coerceAtLeast(6.dp.toPx())
-                    drawRoundRect(
-                        color = markerColor,
-                        topLeft = Offset(upCenterPx - markerW * 0.5f, markerY),
-                        size = Size(markerW, markerThick),
-                        cornerRadius = CornerRadius(markerThick, markerThick)
-                    )
-                    drawRoundRect(
-                        color = markerColor,
-                        topLeft = Offset(downCenterPx - markerW * 0.5f, markerY),
-                        size = Size(markerW, markerThick),
-                        cornerRadius = CornerRadius(markerThick, markerThick)
-                    )
-                    if (settings.enablePowerButtonPop) {
-                        val pMarkerW = (powerSpreadPx * 0.48f).coerceAtLeast(6.dp.toPx())
-                        drawRoundRect(
-                            color = powerMarkerColor,
-                            topLeft = Offset(powerCenterPx - pMarkerW * 0.5f, markerY),
-                            size = Size(pMarkerW, markerThick),
-                            cornerRadius = CornerRadius(markerThick, markerThick)
-                        )
-                    }
-                }
             }
         }
 
@@ -629,18 +433,6 @@ fun DevicePreviewCanvas(
             verticalAlignment = Alignment.CenterVertically
         ) {
             PreviewLegendDot(
-                color = Color.Black,
-                label = if (popAllowed) "Volume Pops" else "Pops Off",
-                onClick = { if (popAllowed) onPreviewTap(PreviewTarget.POP_BOTH) }
-            )
-            if (settings.enablePowerButtonPop && popAllowed) {
-                PreviewLegendDot(
-                    color = secondaryAccent,
-                    label = "Power Pop",
-                    onClick = { onPreviewTap(PreviewTarget.POP_POWER) }
-                )
-            }
-            PreviewLegendDot(
                 color = activeAccent,
                 label = when {
                     !settings.enableVolumeSliderHud -> "HUD Off"
@@ -649,52 +441,6 @@ fun DevicePreviewCanvas(
                 },
                 onClick = { if (hudAllowed) onPreviewTap(PreviewTarget.HUD) }
             )
-        }
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPreviewPop(
-    popPath: Path,
-    canvasWidth: Float,
-    canvasHeight: Float,
-    centerPx: Float,
-    spreadPx: Float,
-    protrusionPx: Float,
-    screenEdge: ScreenEdge,
-    highlight: Boolean,
-    accent: Color,
-    strokeWidth: Float
-) {
-    val startPx = centerPx - spreadPx * 0.5f
-    when (screenEdge) {
-        ScreenEdge.RIGHT,
-        ScreenEdge.LEFT -> {
-            val left = if (screenEdge == ScreenEdge.RIGHT) canvasWidth - protrusionPx else 0f
-            translate(left = left, top = startPx) {
-                buildEdgePopPath(
-                    path = popPath,
-                    canvasWidth = protrusionPx,
-                    canvasHeight = spreadPx,
-                    protrusionPx = protrusionPx,
-                    screenEdge = screenEdge
-                )
-                drawPath(path = popPath, color = Color.Black)
-            }
-        }
-
-        ScreenEdge.TOP,
-        ScreenEdge.BOTTOM -> {
-            val top = if (screenEdge == ScreenEdge.BOTTOM) canvasHeight - protrusionPx else 0f
-            translate(left = startPx, top = top) {
-                buildEdgePopPath(
-                    path = popPath,
-                    canvasWidth = spreadPx,
-                    canvasHeight = protrusionPx,
-                    protrusionPx = protrusionPx,
-                    screenEdge = screenEdge
-                )
-                drawPath(path = popPath, color = Color.Black)
-            }
         }
     }
 }
@@ -725,28 +471,5 @@ private fun PreviewLegendDot(
             softWrap = false,
             overflow = TextOverflow.Ellipsis
         )
-    }
-}
-
-private fun computePreviewCenter(
-    portraitFraction: Float,
-    rotation: Int,
-    axisLengthPx: Float,
-    elementSpanPx: Float
-): Float {
-    val baseFraction = EdgeOrientationMapper.resolveAxisFraction(portraitFraction, rotation)
-    val rawCenter = baseFraction * axisLengthPx
-    val half = elementSpanPx * 0.5f
-    if (axisLengthPx <= elementSpanPx) return axisLengthPx * 0.5f
-    return rawCenter.coerceIn(half, axisLengthPx - half)
-}
-
-private fun previewEdgePoint(edge: ScreenEdge, fractionAlongEdge: Float): Pair<Float, Float> {
-    val f = fractionAlongEdge.coerceIn(0f, 1f)
-    return when (edge) {
-        ScreenEdge.LEFT -> Pair(0.06f, f)
-        ScreenEdge.RIGHT -> Pair(0.94f, f)
-        ScreenEdge.TOP -> Pair(f, 0.06f)
-        ScreenEdge.BOTTOM -> Pair(f, 0.94f)
     }
 }

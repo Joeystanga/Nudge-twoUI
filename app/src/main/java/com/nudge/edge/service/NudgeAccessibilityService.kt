@@ -40,11 +40,9 @@ import com.nudge.edge.MainActivity
 import com.nudge.edge.data.SettingsRepository
 import com.nudge.edge.data.VolumeController
 import com.nudge.edge.model.EdgeOrientationMapper
-import com.nudge.edge.model.HudTriggerMode
 import com.nudge.edge.model.NudgeSettings
 import com.nudge.edge.model.PreviewTarget
 import com.nudge.edge.model.ScreenEdge
-import com.nudge.edge.ui.components.EdgePopStripOverlay
 import com.nudge.edge.ui.components.QuickVolumeModal
 import com.nudge.edge.ui.components.VolumeSliderHud
 import com.nudge.edge.ui.components.computeHudCutoutThicknessDp
@@ -85,21 +83,12 @@ class NudgeAccessibilityService : AccessibilityService() {
     private var audioHandler: Handler? = null
     private var audioScope: CoroutineScope? = null
 
-    private var edgePopView: ComposeView? = null
     private var hudView: ComposeView? = null
     private var modalView: View? = null
-    private var swipeCatcherView: View? = null
 
     private var hudParams: WindowManager.LayoutParams? = null
     private var modalParams: WindowManager.LayoutParams? = null
-    private var swipeCatcherParams: WindowManager.LayoutParams? = null
 
-    private val upPopActive = MutableStateFlow(false)
-    private val downPopActive = MutableStateFlow(false)
-    private val powerPopActive = MutableStateFlow(false)
-    private val upPulseTrigger = MutableStateFlow(0)
-    private val downPulseTrigger = MutableStateFlow(0)
-    private val powerPulseTrigger = MutableStateFlow(0)
     private val hudActive = MutableStateFlow(false)
     private val modalActive = MutableStateFlow(false)
     private val volumeFraction = MutableStateFlow(0.5f)
@@ -107,22 +96,12 @@ class NudgeAccessibilityService : AccessibilityService() {
     private val rotationState = MutableStateFlow(Surface.ROTATION_0)
     private val rotationResetEpoch = MutableStateFlow(0)
 
-    private var upRetractJob: Job? = null
-    private var downRetractJob: Job? = null
-    private var powerRetractJob: Job? = null
     private var upRepeatJob: Job? = null
     private var downRepeatJob: Job? = null
     private var hudHideJob: Job? = null
     private var hudCollapseGoneJob: Job? = null
     private var modalCollapseGoneJob: Job? = null
-    private var swipeTouchActive = false
     private var hudScrubbing = false
-
-    @Volatile
-    private var lastVolumePressTimeMs = 0L
-
-    @Volatile
-    private var lastPowerTriggerTimeMs = 0L
 
     @Volatile
     private var lastProgrammaticAudioTimeMs = 0L
@@ -229,16 +208,6 @@ class NudgeAccessibilityService : AccessibilityService() {
             } else if (action == Intent.ACTION_USER_PRESENT) {
                 isScreenInteractive = true
                 return
-            }
-            if (action == Intent.ACTION_SCREEN_ON || action == Intent.ACTION_SCREEN_OFF) {
-                val settings = settingsRepository.settings.value
-                val isLandscape = EdgeOrientationMapper.isLandscapeRotation(rotationState.value)
-                val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
-                if (!settings.enablePowerButtonPop || !popAllowed) return
-                val now = SystemClock.uptimeMillis()
-                if (now - lastPowerTriggerTimeMs >= 260L) {
-                    triggerPowerPop(holdMs = settings.popAutoHideMs, settings = settings)
-                }
             }
         }
     }
@@ -355,11 +324,6 @@ class NudgeAccessibilityService : AccessibilityService() {
                 if (modalActive.value) {
                     dismissModalOverlay()
                 }
-                if (currentSettings.enablePowerButtonPop &&
-                    EdgeOrientationMapper.shouldShowEdgePop(isLandscape, currentSettings)
-                ) {
-                    triggerPowerPop(holdMs = currentSettings.popAutoHideMs, settings = currentSettings)
-                }
             }
             return super.onKeyEvent(event)
         }
@@ -370,7 +334,6 @@ class NudgeAccessibilityService : AccessibilityService() {
 
         val isUp = keyCode == KeyEvent.KEYCODE_VOLUME_UP
         val direction = if (isUp) 1 else -1
-        val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, currentSettings)
         val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, currentSettings)
         val showSystemUi = EdgeOrientationMapper.shouldShowSystemVolumePanel(isLandscape, currentSettings)
 
@@ -405,15 +368,8 @@ class NudgeAccessibilityService : AccessibilityService() {
                     initialDelayMs = 300L
                 )
                 serviceScope.launch(Dispatchers.Main) {
-                    if (popAllowed) {
-                        triggerVolumePop(
-                            isUp = isUp,
-                            settings = currentSettings,
-                            autoRetract = false
-                        )
-                    }
                     if (hudAllowed) {
-                        handleHudTrigger(settings = currentSettings, initialPress = true)
+                        handleHudTrigger(settings = currentSettings)
                     }
                 }
                 return true
@@ -435,11 +391,6 @@ class NudgeAccessibilityService : AccessibilityService() {
                 }
                 if (!wasConsumed) {
                     return super.onKeyEvent(event)
-                }
-                if (popAllowed) {
-                    serviceScope.launch(Dispatchers.Main) {
-                        schedulePopRetract(isUp = isUp, settings = currentSettings)
-                    }
                 }
                 return true
             }
@@ -497,18 +448,13 @@ class NudgeAccessibilityService : AccessibilityService() {
         hudHideJob?.cancel()
         hudCollapseGoneJob?.cancel()
         modalCollapseGoneJob?.cancel()
-        upRetractJob?.cancel()
-        downRetractJob?.cancel()
         keyHeldDown = false
         consumedUpKeyDown = false
         consumedDownKeyDown = false
         consumedBackKeyDown = false
         hudScrubbing = false
-        swipeTouchActive = false
         modalActive.value = false
         hudActive.value = false
-        upPopActive.value = false
-        downPopActive.value = false
         modalView?.visibility = View.GONE
         hudView?.visibility = View.GONE
     }
@@ -520,9 +466,7 @@ class NudgeAccessibilityService : AccessibilityService() {
         if (newRotation == oldRotation && newSize == oldSize) return
 
         cancelAllActiveAnimationsAndJobs()
-        edgePopView?.visibility = View.GONE
         hudView?.visibility = View.GONE
-        swipeCatcherView?.visibility = View.GONE
         modalView?.visibility = View.GONE
 
         rotationResetEpoch.value += 1
@@ -530,77 +474,20 @@ class NudgeAccessibilityService : AccessibilityService() {
         screenSizeState.value = newSize
 
         reanchorOverlaysImmediately(settingsRepository.settings.value, newRotation)
-        edgePopView?.visibility = View.VISIBLE
     }
 
     private fun cancelAllActiveAnimationsAndJobs() {
-        upRetractJob?.cancel()
-        downRetractJob?.cancel()
-        powerRetractJob?.cancel()
         hudHideJob?.cancel()
         hudCollapseGoneJob?.cancel()
         modalCollapseGoneJob?.cancel()
-        upPopActive.value = false
-        downPopActive.value = false
-        powerPopActive.value = false
         hudActive.value = false
         modalActive.value = false
-        swipeTouchActive = false
         hudScrubbing = false
         settingsRepository.clearLivePreview()
     }
 
-    private fun triggerVolumePop(
-        isUp: Boolean,
-        settings: NudgeSettings,
-        autoRetract: Boolean
-    ) {
-        if (isUp) {
-            upRetractJob?.cancel()
-            if (upPopActive.value) {
-                upPulseTrigger.value += 1
-            } else {
-                upPopActive.value = true
-            }
-        } else {
-            downRetractJob?.cancel()
-            if (downPopActive.value) {
-                downPulseTrigger.value += 1
-            } else {
-                downPopActive.value = true
-            }
-        }
-        if (autoRetract) {
-            schedulePopRetract(isUp = isUp, settings = settings)
-        }
-    }
-
-    private fun handleHudTrigger(
-        settings: NudgeSettings,
-        initialPress: Boolean
-    ) {
-        if (initialPress) {
-            val now = SystemClock.uptimeMillis()
-            val isLandscape = EdgeOrientationMapper.isLandscapeRotation(rotationState.value)
-            val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
-            when (settings.hudTriggerMode) {
-                HudTriggerMode.SIMULTANEOUS -> showHud(settings.hudAutoHideMs)
-                HudTriggerMode.SECOND_PRESS -> {
-                    val isConsecutive = (now - lastVolumePressTimeMs) <= 1500L
-                    if (hudActive.value || isConsecutive) {
-                        showHud(settings.hudAutoHideMs)
-                    }
-                }
-                HudTriggerMode.SWIPE_FROM_POP -> {
-                    if (!popAllowed || hudActive.value) {
-                        showHud(settings.hudAutoHideMs)
-                    }
-                }
-            }
-            lastVolumePressTimeMs = now
-        } else if (hudActive.value || settings.hudTriggerMode == HudTriggerMode.SIMULTANEOUS) {
-            showHud(settings.hudAutoHideMs)
-        }
+    private fun handleHudTrigger(settings: NudgeSettings) {
+        showHud(settings.hudAutoHideMs)
     }
 
     private fun ensureAudioExecutor(): Handler {
@@ -758,7 +645,7 @@ class NudgeAccessibilityService : AccessibilityService() {
                 if (hudAllowed && keyHeldDown && holdSequence.get() == sequence) {
                     withContext(Dispatchers.Main) {
                         if (keyHeldDown && holdSequence.get() == sequence) {
-                            handleHudTrigger(settings = latest, initialPress = false)
+                            handleHudTrigger(settings = latest)
                         }
                     }
                 }
@@ -781,44 +668,6 @@ class NudgeAccessibilityService : AccessibilityService() {
         } else {
             downRepeatJob?.cancel()
             downRepeatJob = null
-        }
-    }
-
-    private fun triggerPowerPop(holdMs: Long, settings: NudgeSettings) {
-        lastPowerTriggerTimeMs = SystemClock.uptimeMillis()
-        powerRetractJob?.cancel()
-        if (powerPopActive.value) {
-            powerPulseTrigger.value += 1
-        } else {
-            powerPopActive.value = true
-        }
-        if (settings.hapticsEnabled) {
-            audioScope?.launch { volumeController.triggerHaptic(strong = false) }
-        }
-        powerRetractJob = serviceScope.launch {
-            delay(holdMs)
-            powerPopActive.value = false
-        }
-    }
-
-    private fun schedulePopRetract(isUp: Boolean, settings: NudgeSettings) {
-        val lingerMs = settings.popAutoHideMs
-        if (isUp) {
-            upRetractJob?.cancel()
-            upRetractJob = serviceScope.launch {
-                delay(lingerMs)
-                if (!swipeTouchActive) {
-                    upPopActive.value = false
-                }
-            }
-        } else {
-            downRetractJob?.cancel()
-            downRetractJob = serviceScope.launch {
-                delay(lingerMs)
-                if (!swipeTouchActive) {
-                    downPopActive.value = false
-                }
-            }
         }
     }
 
@@ -847,142 +696,8 @@ class NudgeAccessibilityService : AccessibilityService() {
         val initialSettings = settingsRepository.settings.value
         val initialRotation = rotationState.value
 
-        val popParams = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            baseOverlayFlags() or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.LEFT
-            x = 0
-            y = 0
-            applyEdgeCutoutAndInsets()
-        }
-
-        val popView = createComposeOverlay {
-            val settings by settingsRepository.settings.collectAsState()
-            val rotation by rotationState.collectAsState()
-            val resetEpoch by rotationResetEpoch.collectAsState()
-            val upActive by upPopActive.collectAsState()
-            val downActive by downPopActive.collectAsState()
-            val powerActive by powerPopActive.collectAsState()
-            val upPulse by upPulseTrigger.collectAsState()
-            val downPulse by downPulseTrigger.collectAsState()
-            val powerPulse by powerPulseTrigger.collectAsState()
-            val preview by settingsRepository.previewTarget.collectAsState()
-
-            val isLandscape = EdgeOrientationMapper.isLandscapeRotation(rotation)
-            val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
-            val screenEdge = EdgeOrientationMapper.resolvePhysicalEdge(
-                settings.popEdgeSide,
-                rotation
-            )
-
-            val upExpanded = popAllowed && (
-                upActive ||
-                    preview == PreviewTarget.POP_UP ||
-                    preview == PreviewTarget.POP_BOTH
-                )
-            val downExpanded = popAllowed && (
-                downActive ||
-                    preview == PreviewTarget.POP_DOWN ||
-                    preview == PreviewTarget.POP_BOTH
-                )
-            val powerExpanded = popAllowed &&
-                settings.enablePowerButtonPop &&
-                (powerActive || preview == PreviewTarget.POP_POWER)
-
-            EdgePopStripOverlay(
-                settings = settings,
-                screenEdge = screenEdge,
-                displayRotation = rotation,
-                upExpanded = upExpanded,
-                downExpanded = downExpanded,
-                powerExpanded = powerExpanded,
-                upPulseTrigger = upPulse,
-                downPulseTrigger = downPulse,
-                powerPulseTrigger = powerPulse,
-                resetEpoch = resetEpoch
-            )
-        }
-        edgePopView = popView
-        windowManager.addView(popView, popParams)
-
-        setupSwipeCatcherView(initialSettings, initialRotation)
-
         if (initialSettings.enableVolumeSliderHud) {
             attachHudAndModalOverlays(initialSettings, initialRotation)
-        }
-    }
-
-    private fun setupSwipeCatcherView(settings: NudgeSettings, rotation: Int) {
-        val popEdge = EdgeOrientationMapper.resolvePhysicalEdge(settings.popEdgeSide, rotation)
-        val catcherSpec = buildSwipeCatcherSpec(settings, popEdge, rotation, visible = false)
-        val catcherParams = specToLayoutParams(catcherSpec)
-        val catcherView = View(this).apply {
-            visibility = View.GONE
-            setOnTouchListener(createSwipeCatcherListener())
-        }
-        swipeCatcherParams = catcherParams
-        swipeCatcherView = catcherView
-        windowManager.addView(catcherView, catcherParams)
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    private fun createSwipeCatcherListener(): View.OnTouchListener {
-        var startX = 0f
-        var startY = 0f
-        var triggered = false
-        return View.OnTouchListener { _, motion ->
-            val currentSettings = settingsRepository.settings.value
-            val screenEdge = EdgeOrientationMapper.resolvePhysicalEdge(
-                currentSettings.popEdgeSide,
-                rotationState.value
-            )
-            val thresholdPx = dpToPx(12f).toFloat()
-            when (motion.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    swipeTouchActive = true
-                    triggered = false
-                    startX = motion.rawX
-                    startY = motion.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!triggered) {
-                        val dx = motion.rawX - startX
-                        val dy = motion.rawY - startY
-                        val swiped = when (screenEdge) {
-                            ScreenEdge.RIGHT -> dx <= -thresholdPx
-                            ScreenEdge.LEFT -> dx >= thresholdPx
-                            ScreenEdge.TOP -> dy >= thresholdPx
-                            ScreenEdge.BOTTOM -> dy <= -thresholdPx
-                        }
-                        if (swiped) {
-                            triggered = true
-                            swipeTouchActive = false
-                            upPopActive.value = false
-                            downPopActive.value = false
-                            showHud(currentSettings.hudAutoHideMs)
-                            if (currentSettings.hapticsEnabled) {
-                                volumeController.triggerHaptic(strong = true)
-                            }
-                        }
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP,
-                MotionEvent.ACTION_CANCEL -> {
-                    swipeTouchActive = false
-                    if (!triggered) {
-                        if (upPopActive.value) schedulePopRetract(isUp = true, settings = currentSettings)
-                        if (downPopActive.value) schedulePopRetract(isUp = false, settings = currentSettings)
-                    }
-                    true
-                }
-                else -> false
-            }
         }
     }
 
@@ -1130,13 +845,8 @@ class NudgeAccessibilityService : AccessibilityService() {
     }
 
     private fun detachAllOverlays() {
-        removeOverlayView(edgePopView)
-        removeOverlayView(swipeCatcherView)
         removeOverlayView(hudView)
         removeOverlayView(modalView)
-        edgePopView = null
-        swipeCatcherView = null
-        swipeCatcherParams = null
         hudView = null
         hudParams = null
         modalView = null
@@ -1151,14 +861,7 @@ class NudgeAccessibilityService : AccessibilityService() {
                 .distinctUntilChanged()
                 .collect { (settings, rotation, _) ->
                     val isLandscape = EdgeOrientationMapper.isLandscapeRotation(rotation)
-                    val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, settings)
                     val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, settings)
-
-                    if (!popAllowed && (upPopActive.value || downPopActive.value || powerPopActive.value)) {
-                        upPopActive.value = false
-                        downPopActive.value = false
-                        powerPopActive.value = false
-                    }
 
                     if (settings.enableVolumeSliderHud) {
                         attachHudAndModalOverlays(settings, rotation)
@@ -1178,42 +881,18 @@ class NudgeAccessibilityService : AccessibilityService() {
         serviceScope.launch {
             combine(
                 settingsRepository.settings,
-                upPopActive,
-                downPopActive,
                 hudActive,
                 settingsRepository.previewTarget
-            ) { settings, up, down, hud, preview ->
+            ) { settings, hud, preview ->
                 HudTouchSnapshot(
                     settings = settings,
-                    swipeActive = (up || down) &&
-                        settings.hudTriggerMode == HudTriggerMode.SWIPE_FROM_POP &&
-                        !hud,
                     hudVisible = hud || preview == PreviewTarget.HUD
                 )
             }.combine(rotationState) { snapshot, rotation ->
                 Pair(snapshot, rotation)
             }.distinctUntilChanged().collect { (snapshot, rotation) ->
                 val isLandscape = EdgeOrientationMapper.isLandscapeRotation(rotation)
-                val popAllowed = EdgeOrientationMapper.shouldShowEdgePop(isLandscape, snapshot.settings)
                 val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, snapshot.settings)
-
-                val popEdge = EdgeOrientationMapper.resolvePhysicalEdge(
-                    snapshot.settings.popEdgeSide,
-                    rotation
-                )
-                val showSwipeCatcher = popAllowed && hudAllowed && snapshot.swipeActive
-                val catcherView = swipeCatcherView
-                val catcherParams = swipeCatcherParams
-                if (catcherView != null && catcherParams != null) {
-                    val catcherSpec = buildSwipeCatcherSpec(
-                        settings = snapshot.settings,
-                        screenEdge = popEdge,
-                        rotation = rotation,
-                        visible = showSwipeCatcher
-                    )
-                    catcherView.visibility = if (showSwipeCatcher) View.VISIBLE else View.GONE
-                    applyLayoutSpecIfChanged(catcherView, catcherParams, catcherSpec)
-                }
 
                 val hView = hudView
                 val hParams = hudParams
@@ -1341,55 +1020,6 @@ class NudgeAccessibilityService : AccessibilityService() {
             y = spec.y
             applyEdgeCutoutAndInsets()
         }
-    }
-
-    private fun buildSwipeCatcherSpec(
-        settings: NudgeSettings,
-        screenEdge: ScreenEdge,
-        rotation: Int,
-        visible: Boolean
-    ): WindowLayoutSpec {
-        val isVertical = screenEdge == ScreenEdge.LEFT || screenEdge == ScreenEdge.RIGHT
-        val breadthPx = dpToPx(maxOf(settings.popWidthDp * 1.15f, 44f))
-        val targetFraction = if (upPopActive.value) settings.volumeUpYFraction else settings.volumeDownYFraction
-        val spanPx = dpToPx(settings.popHeightDp)
-        val (screenW, screenH) = screenSizeState.value
-
-        val width = if (isVertical) breadthPx else spanPx
-        val height = if (isVertical) spanPx else breadthPx
-        val x: Int
-        val y: Int
-        if (isVertical) {
-            x = 0
-            y = EdgeOrientationMapper.computeElementTopOrLeftPx(
-                portraitYFraction = targetFraction,
-                rotation = rotation,
-                axisLengthPx = screenH.toFloat(),
-                elementSpanPx = height
-            )
-        } else {
-            x = EdgeOrientationMapper.computeElementTopOrLeftPx(
-                portraitYFraction = targetFraction,
-                rotation = rotation,
-                axisLengthPx = screenW.toFloat(),
-                elementSpanPx = width
-            )
-            y = 0
-        }
-
-        val flags = if (visible) {
-            baseOverlayFlags()
-        } else {
-            baseOverlayFlags() or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        }
-        return WindowLayoutSpec(
-            width = width,
-            height = height,
-            gravity = screenEdgeGravity(screenEdge),
-            x = x,
-            y = y,
-            flags = flags
-        )
     }
 
     private fun buildHudLayoutSpec(
@@ -1520,7 +1150,6 @@ class NudgeAccessibilityService : AccessibilityService() {
 
     private data class HudTouchSnapshot(
         val settings: NudgeSettings,
-        val swipeActive: Boolean,
         val hudVisible: Boolean
     )
 
