@@ -2,7 +2,6 @@ package com.nudge.edge.data
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.AudioAttributes
 import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
@@ -43,14 +42,9 @@ class VolumeController(context: Context) {
     }
 
     private val defaultVibrator: Vibrator by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val manager =
-                appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            manager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
+        val manager =
+            appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+        manager.defaultVibrator
     }
 
     private var fineGetterMethod: Method? = null
@@ -468,26 +462,14 @@ class VolumeController(context: Context) {
             mode == AudioManager.MODE_IN_CALL ||
             mode == AudioManager.MODE_IN_COMMUNICATION
     }
-
     fun triggerHaptic(strong: Boolean = false) {
         val vibrator = defaultVibrator
         if (!vibrator.hasVibrator()) return
         val effect = createHapticEffect(vibrator, strong)
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val attrs = VibrationAttributes.Builder()
-                    .setUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
-                    .build()
-                vibrator.vibrate(effect, attrs)
-            } else {
-                @Suppress("DEPRECATION")
-                val audioAttrs = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-                vibrator.vibrate(effect, audioAttrs)
-            }
-        }
+        val attrs = VibrationAttributes.Builder()
+            .setUsage(VibrationAttributes.USAGE_ACCESSIBILITY)
+            .build()
+        runCatching { vibrator.vibrate(effect, attrs) }
     }
 
     private fun createHapticEffect(vibrator: Vibrator, strong: Boolean): VibrationEffect {

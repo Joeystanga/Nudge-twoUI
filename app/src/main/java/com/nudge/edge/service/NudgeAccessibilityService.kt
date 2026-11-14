@@ -419,11 +419,6 @@ class NudgeAccessibilityService : AccessibilityService() {
                 return true
             }
 
-            KeyEvent.ACTION_MULTIPLE -> {
-                val wasConsumed = if (isUp) consumedUpKeyDown else consumedDownKeyDown
-                return if (wasConsumed) true else super.onKeyEvent(event)
-            }
-
             KeyEvent.ACTION_UP -> {
                 keyHeldDown = false
                 holdSequence.incrementAndGet()
