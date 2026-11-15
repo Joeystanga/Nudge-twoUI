@@ -1,5 +1,7 @@
 package com.nudge.edge
 
+import com.nudge.edge.ui.components.computeHudMenuExtraDp
+import com.nudge.edge.ui.components.HUD_MENU_BUTTON_GAP_DP
 import android.view.Surface
 import com.nudge.edge.data.VolumeController
 import com.nudge.edge.model.EdgeOrientationMapper
@@ -222,5 +224,14 @@ class NudgeSettingsTest {
         assertEquals(defaults.hudWidthDp + 6.0f, computeHudCutoutThicknessDp(defaults.hudWidthDp, defaults.hudEdgeInsetDp), 0.001f)
         assertEquals(defaults.hudWidthDp + 12f + 6.0f, computeHudCutoutThicknessDp(defaults.hudWidthDp, 12f), 0.001f)
         assertEquals(drawnSpanDp + (22f + 6.0f) * 2f, computeHudOuterSpanDp(defaults.hudHeightDp), 0.001f)
+    }
+
+    @Test
+    fun menuButtonAddsExtraSpanOnlyWhenShown() {
+        assertEquals(0f, computeHudMenuExtraDp(45f, false), 0.001f)
+        assertEquals(45f + HUD_MENU_BUTTON_GAP_DP, computeHudMenuExtraDp(45f, true), 0.001f)
+        val base = computeHudOuterSpanDp(155f)
+        assertEquals(base + 53f, computeHudOuterSpanDp(155f, 53f), 0.001f)
+        assertTrue(NudgeSettings().showMenuButton)
     }
 }

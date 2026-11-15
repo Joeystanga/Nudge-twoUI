@@ -1,5 +1,6 @@
 package com.nudge.edge.service
 
+import com.nudge.edge.ui.components.computeHudMenuExtraDp
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
@@ -728,6 +729,7 @@ class NudgeAccessibilityService : AccessibilityService() {
                     hudHeightDp = latestSettings.hudHeightDp,
                     hudCornerRadiusDp = latestSettings.hudCornerRadiusDp,
                     floatingMode = latestSettings.floatingMode,
+                    showMenuButton = latestSettings.showMenuButton,
                     edgeInsetDp = latestSettings.hudEdgeInsetDp,
                     volumeFraction = volFraction,
                     isVisible = visible,
@@ -1031,7 +1033,8 @@ class NudgeAccessibilityService : AccessibilityService() {
         val isVertical = screenEdge == ScreenEdge.LEFT || screenEdge == ScreenEdge.RIGHT
         val insetDp = settings.hudEdgeInsetDp
         val thicknessPx = dpToPx(computeHudCutoutThicknessDp(settings.hudWidthDp, insetDp))
-        val spanPx = dpToPx(computeHudOuterSpanDp(settings.hudHeightDp))
+        val menuExtraDp = computeHudMenuExtraDp(settings.hudWidthDp, settings.showMenuButton)
+        val spanPx = dpToPx(computeHudOuterSpanDp(settings.hudHeightDp, menuExtraDp))
         val width = if (isVertical) thicknessPx else spanPx
         val height = if (isVertical) spanPx else thicknessPx
         val (screenW, screenH) = screenSizeState.value

@@ -50,6 +50,7 @@ class SettingsRepository private constructor(context: Context) {
         val LANDSCAPE_HUD_Y = floatPreferencesKey("landscape_hud_y")
         val SHOW_SYSTEM_PANEL_LANDSCAPE = booleanPreferencesKey("show_system_panel_landscape")
         val FLOATING_MODE = booleanPreferencesKey("floating_mode")
+        val SHOW_MENU_BUTTON = booleanPreferencesKey("show_menu_button")
         val HUD_EDGE_INSET_DP = floatPreferencesKey("hud_edge_inset_dp")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
         val LIGHT_MODE = booleanPreferencesKey("light_mode")
@@ -122,6 +123,7 @@ class SettingsRepository private constructor(context: Context) {
             showSystemPanelInLandscape =
                 prefs[Keys.SHOW_SYSTEM_PANEL_LANDSCAPE] ?: defaults.showSystemPanelInLandscape,
             floatingMode = prefs[Keys.FLOATING_MODE] ?: defaults.floatingMode,
+            showMenuButton = prefs[Keys.SHOW_MENU_BUTTON] ?: defaults.showMenuButton,
             hudEdgeInsetDp = NudgeSettings.clampHudEdgeInset(
                 prefs[Keys.HUD_EDGE_INSET_DP] ?: defaults.hudEdgeInsetDp
             ),
@@ -281,6 +283,15 @@ class SettingsRepository private constructor(context: Context) {
         requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
         scope.launch {
             appContext.nudgeDataStore.edit { it[Keys.FLOATING_MODE] = enabled }
+        }
+    }
+
+    fun setShowMenuButton(show: Boolean) {
+        if (_settings.value.showMenuButton == show) return
+        _settings.value = _settings.value.copy(showMenuButton = show)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.SHOW_MENU_BUTTON] = show }
         }
     }
 

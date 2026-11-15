@@ -227,6 +227,47 @@ private fun DesignSection(
 
                 GroupDivider()
 
+                Surface(
+                    shape = RectangleShape,
+                    color = Color.Transparent,
+                    onClick = { repository.setShowMenuButton(!settings.showMenuButton) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Menu Button",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Three-dot button on the slider opens the full mixer",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Switch(
+                            checked = settings.showMenuButton,
+                            onCheckedChange = repository::setShowMenuButton
+                        )
+                    }
+                }
+
+                GroupDivider()
+
                 StepperSliderCard(
                     title = "Edge Inset",
                     valueLabel = "${settings.hudEdgeInsetDp.roundToInt()} dp",

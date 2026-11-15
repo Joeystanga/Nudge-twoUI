@@ -63,9 +63,15 @@ const val HUD_CUTOUT_INNER_PAD_DP = 6.0f
 const val HUD_CUTOUT_PILL_TRIM_DP = 4f
 const val HUD_CUTOUT_FILLET_TAIL_DP = 22f
 const val HUD_CUTOUT_PILL_START_OFFSET_DP = HUD_CUTOUT_FILLET_TAIL_DP + HUD_CUTOUT_INNER_PAD_DP
+const val HUD_MENU_BUTTON_GAP_DP = 8f
 
-fun computeHudOuterSpanDp(pillHeightDp: Float): Float {
-    return computeHudDrawnPillSpanDp(pillHeightDp) + HUD_CUTOUT_PILL_START_OFFSET_DP * 2f
+/** Extra length the housing needs to hold the three-dot menu button next to the slider. */
+fun computeHudMenuExtraDp(pillWidthDp: Float, showMenuButton: Boolean): Float {
+    return if (showMenuButton) pillWidthDp + HUD_MENU_BUTTON_GAP_DP else 0f
+}
+
+fun computeHudOuterSpanDp(pillHeightDp: Float, menuExtraDp: Float = 0f): Float {
+    return computeHudDrawnPillSpanDp(pillHeightDp) + HUD_CUTOUT_PILL_START_OFFSET_DP * 2f + menuExtraDp
 }
 
 fun computeHudDrawnPillSpanDp(pillHeightDp: Float): Float {
@@ -356,6 +362,29 @@ fun DrawScope.drawSpeakerGlyph(
     }
 }
 
+fun DrawScope.drawHudMenuButton(
+    left: Float,
+    top: Float,
+    sizePx: Float,
+    cornerRadiusPx: Float,
+    trackColor: Color,
+    dotColor: Color,
+    dotRadiusPx: Float
+) {
+    drawRoundRect(
+        color = trackColor,
+        topLeft = Offset(left, top),
+        size = Size(sizePx, sizePx),
+        cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx)
+    )
+    val cx = left + sizePx * 0.5f
+    val cy = top + sizePx * 0.5f
+    val step = dotRadiusPx * 3.6f
+    drawCircle(color = dotColor, radius = dotRadiusPx, center = Offset(cx - step, cy))
+    drawCircle(color = dotColor, radius = dotRadiusPx, center = Offset(cx, cy))
+    drawCircle(color = dotColor, radius = dotRadiusPx, center = Offset(cx + step, cy))
+}
+
 @Composable
 fun VolumeSliderHud(
     screenEdge: ScreenEdge,
@@ -366,6 +395,7 @@ fun VolumeSliderHud(
     edgeInsetDp: Float,
     volumeFraction: Float,
     isVisible: Boolean,
+    showMenuButton: Boolean = false,
     resetEpoch: Int = 0,
     onVolumeScrub: (Float) -> Unit,
     onScrubStateChanged: (Boolean) -> Unit,
@@ -407,22 +437,25 @@ fun VolumeSliderHud(
     val isVerticalEdge = screenEdge == ScreenEdge.LEFT || screenEdge == ScreenEdge.RIGHT
     val maxInsetDp = maxOf(edgeInsetDp.coerceAtLeast(0f), animatedInsetDp)
     val cutoutThicknessDp = computeHudCutoutThicknessDp(hudWidthDp, animatedInsetDp)
-    val outerSpanDp = computeHudOuterSpanDp(hudHeightDp)
+    val menuExtraDp = computeHudMenuExtraDp(hudWidthDp, showMenuButton)
+    val outerSpanDp = computeHudOuterSpanDp(hudHeightDp, menuExtraDp)
     val drawnPillSpanDp = computeHudDrawnPillSpanDp(hudHeightDp)
     val totalThicknessDp = computeHudCutoutThicknessDp(hudWidthDp, maxInsetDp)
     val containerWidthDp = if (isVerticalEdge) totalThicknessDp else outerSpanDp
     val containerHeightDp = if (isVerticalEdge) outerSpanDp else totalThicknessDp
 
-    val pillStartPx = with(density) { HUD_CUTOUT_PILL_START_OFFSET_DP.dp.toPx() }
+    val pillStartPx = with(density) {
+        (HUD_CUTOUT_PILL_START_OFFSET_DP + if (isVerticalEdge) menuExtraDp else 0f).dp.toPx()
+    }
     val pillLenPx = with(density) { drawnPillSpanDp.dp.toPx() }
     val pillEndPx = pillStartPx + pillLenPx
     val speakerTapZonePx = with(density) { (hudWidthDp * 0.90f).coerceIn(28f, 40f).dp.toPx() }
     val tapSlopPx = with(density) { 6.dp.toPx() }
-    val swipeMenuThresholdPx = with(density) { 14.dp.toPx() }
 
     val currentOnVolumeScrub by rememberUpdatedState(onVolumeScrub)
     val currentOnScrubStateChanged by rememberUpdatedState(onScrubStateChanged)
     val currentOnOpenMenu by rememberUpdatedState(onOpenMenu)
+    val currentShowMenu by rememberUpdatedState(showMenuButton)
     val currentPillStart by rememberUpdatedState(pillStartPx)
     val currentPillEnd by rememberUpdatedState(pillEndPx)
     val currentEdge by rememberUpdatedState(screenEdge)
@@ -465,6 +498,23 @@ fun VolumeSliderHud(
                 downX <= pStart + speakerTapZonePx
             }
 
+            val inMenuZone = currentShowMenu && (if (vertical) downY < pStart else downX > pEnd)
+            if (inMenuZone) {
+                down.consume()
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    change.consume()
+                    if (!change.pressed) {
+                        if ((change.position - down.position).getDistance() <= tapSlopPx * 3f) {
+                            currentOnOpenMenu()
+                        }
+                        break
+                    }
+                }
+                return@awaitEachGesture
+            }
+
             var movedAlongTrack = false
             var openedMenu = false
             val longPressJob = coroutineScope.launch {
@@ -497,23 +547,7 @@ fun VolumeSliderHud(
                     val dx = change.position.x - downX
                     val dy = change.position.y - downY
 
-                    val inwardDelta = when (edge) {
-                        ScreenEdge.RIGHT -> -dx
-                        ScreenEdge.LEFT -> dx
-                        ScreenEdge.TOP -> dy
-                        ScreenEdge.BOTTOM -> -dy
-                    }
                     val trackDelta = if (vertical) abs(dy) else abs(dx)
-
-                    if (!openedMenu && inwardDelta >= swipeMenuThresholdPx && inwardDelta > trackDelta * 1.25f) {
-                        openedMenu = true
-                        longPressJob.cancel()
-                        isScrubbing = false
-                        currentOnScrubStateChanged(false)
-                        change.consume()
-                        currentOnOpenMenu()
-                        break
-                    }
 
                     if (!change.pressed) {
                         longPressJob.cancel()
@@ -617,8 +651,9 @@ fun VolumeSliderHud(
                 val pillCenterX = bezelEdgeX + inwardDir * (bezelPadPx + pillW * 0.5f)
                 val pillLeft = pillCenterX - pillW * 0.5f
                 val pillRight = pillCenterX + pillW * 0.5f
-                val pillTop = pillStartOffsetPx
-                val pillBottom = pillStartOffsetPx + pillSpan
+                val menuBlockPx = menuExtraDp.dp.toPx()
+                val pillTop = pillStartOffsetPx + menuBlockPx
+                val pillBottom = pillTop + pillSpan
 
                 pillPath.reset()
                 pillPath.addRoundRect(
@@ -628,6 +663,18 @@ fun VolumeSliderHud(
                     )
                 )
                 drawPath(path = pillPath, color = HudTrackCharcoal)
+
+                if (showMenuButton) {
+                    drawHudMenuButton(
+                        left = pillLeft,
+                        top = pillStartOffsetPx,
+                        sizePx = pillW,
+                        cornerRadiusPx = pillCornerRadius,
+                        trackColor = HudTrackCharcoal,
+                        dotColor = HudIconOnDark,
+                        dotRadiusPx = (pillW * 0.07f).coerceIn(1.6.dp.toPx(), 2.6.dp.toPx())
+                    )
+                }
 
                 val fillTop = (pillBottom - pillSpan * displayedFraction).coerceIn(pillTop, pillBottom)
 
@@ -710,6 +757,18 @@ fun VolumeSliderHud(
                     )
                 )
                 drawPath(path = pillPath, color = HudTrackCharcoal)
+
+                if (showMenuButton) {
+                    drawHudMenuButton(
+                        left = pillRight + HUD_MENU_BUTTON_GAP_DP.dp.toPx(),
+                        top = pillTop,
+                        sizePx = pillW,
+                        cornerRadiusPx = pillCornerRadius,
+                        trackColor = HudTrackCharcoal,
+                        dotColor = HudIconOnDark,
+                        dotRadiusPx = (pillW * 0.07f).coerceIn(1.6.dp.toPx(), 2.6.dp.toPx())
+                    )
+                }
 
                 val fillRight = (pillLeft + pillSpan * displayedFraction).coerceIn(pillLeft, pillRight)
 

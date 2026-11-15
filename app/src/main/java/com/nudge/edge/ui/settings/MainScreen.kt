@@ -1,5 +1,6 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.computeHudMenuExtraDp
 import android.media.AudioManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -324,7 +325,8 @@ private fun LocalFallbackEdgePreviewLayer(
     val density = LocalDensity.current
     val screenWidthPx = with(density) { realScreenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { realScreenHeightDp.dp.toPx() }
-    val hudSpanPx = ceil(with(density) { computeHudOuterSpanDp(settings.hudHeightDp).dp.toPx() }).toInt()
+    val hudMenuExtraDp = computeHudMenuExtraDp(settings.hudWidthDp, settings.showMenuButton)
+    val hudSpanPx = ceil(with(density) { computeHudOuterSpanDp(settings.hudHeightDp, hudMenuExtraDp).dp.toPx() }).toInt()
 
     val isLandscape = EdgeOrientationMapper.isLandscapeRotation(displayRotation)
     val hudAllowed = EdgeOrientationMapper.shouldShowSliderHud(isLandscape, settings)
@@ -369,6 +371,7 @@ private fun LocalFallbackEdgePreviewLayer(
                     hudHeightDp = settings.hudHeightDp,
                     hudCornerRadiusDp = settings.hudCornerRadiusDp,
                     floatingMode = settings.floatingMode,
+                    showMenuButton = settings.showMenuButton,
                     edgeInsetDp = settings.hudEdgeInsetDp,
                     volumeFraction = musicVolumeFraction,
                     isVisible = true,

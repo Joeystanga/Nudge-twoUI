@@ -1,5 +1,8 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.drawHudMenuButton
+import com.nudge.edge.ui.components.computeHudMenuExtraDp
+import com.nudge.edge.ui.components.HUD_MENU_BUTTON_GAP_DP
 import android.view.Surface
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -228,7 +231,9 @@ fun DevicePreviewCanvas(
                         val pillW = settings.hudWidthDp * scale
                         val pillSpan = computeHudDrawnPillSpanDp(settings.hudHeightDp) * scale
                         val cutoutThickness = computeHudCutoutThicknessDp(settings.hudWidthDp, previewInsetDp) * scale
-                        val outerSpan = computeHudOuterSpanDp(settings.hudHeightDp) * scale
+                        val menuExtraDp = computeHudMenuExtraDp(settings.hudWidthDp, settings.showMenuButton)
+                        val menuExtra = menuExtraDp * scale
+                        val outerSpan = computeHudOuterSpanDp(settings.hudHeightDp, menuExtraDp) * scale
                         val bezelPad = (HUD_CUTOUT_BEZEL_PAD_DP + previewInsetDp) * scale
                         val innerPad = HUD_CUTOUT_INNER_PAD_DP * scale
                         val filletTail = HUD_CUTOUT_FILLET_TAIL_DP * scale
@@ -278,7 +283,7 @@ fun DevicePreviewCanvas(
                             val pillCenterX = hudBezelX + inwardDir * (bezelPad + pillW * 0.5f)
                             val pillLeft = pillCenterX - pillW * 0.5f
                             val pillRight = pillCenterX + pillW * 0.5f
-                            val pillTop = hudTop + pillStartOffset
+                            val pillTop = hudTop + pillStartOffset + menuExtra
                             val pillBottom = pillTop + pillSpan
 
                             pillPath.reset()
@@ -289,6 +294,18 @@ fun DevicePreviewCanvas(
                                 )
                             )
                             drawPath(path = pillPath, color = Color(0xFF2C2C2E))
+
+                            if (settings.showMenuButton) {
+                                drawHudMenuButton(
+                                    left = pillLeft,
+                                    top = hudTop + pillStartOffset,
+                                    sizePx = pillW,
+                                    cornerRadiusPx = pillCornerR,
+                                    trackColor = Color(0xFF2C2C2E),
+                                    dotColor = Color.White,
+                                    dotRadiusPx = (pillW * 0.07f).coerceAtLeast(1f)
+                                )
+                            }
 
                             val fillTop = (pillBottom - pillSpan * musicVolumeFraction).coerceIn(pillTop, pillBottom)
                             clipPath(pillPath) {
@@ -364,6 +381,18 @@ fun DevicePreviewCanvas(
                                 )
                             )
                             drawPath(path = pillPath, color = Color(0xFF2C2C2E))
+
+                            if (settings.showMenuButton) {
+                                drawHudMenuButton(
+                                    left = pillRight + HUD_MENU_BUTTON_GAP_DP * scale,
+                                    top = pillTop,
+                                    sizePx = pillW,
+                                    cornerRadiusPx = pillCornerR,
+                                    trackColor = Color(0xFF2C2C2E),
+                                    dotColor = Color.White,
+                                    dotRadiusPx = (pillW * 0.07f).coerceAtLeast(1f)
+                                )
+                            }
 
                             val fillRight = (pillLeft + pillSpan * musicVolumeFraction).coerceIn(pillLeft, pillRight)
                             clipPath(pillPath) {

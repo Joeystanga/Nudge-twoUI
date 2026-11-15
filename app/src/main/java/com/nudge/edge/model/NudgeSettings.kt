@@ -32,6 +32,7 @@ data class NudgeSettings(
     val landscapeHudYFraction: Float = 0.50f,
     val showSystemPanelInLandscape: Boolean = true,
     val floatingMode: Boolean = false,
+    val showMenuButton: Boolean = true,
     val hudEdgeInsetDp: Float = 0f,
     val hapticsEnabled: Boolean = true,
     val lightMode: Boolean = false
