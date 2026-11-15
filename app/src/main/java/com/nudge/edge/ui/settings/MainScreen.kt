@@ -14,14 +14,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,11 +24,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -53,14 +45,6 @@ import com.nudge.edge.ui.components.VolumeSliderHud
 import com.nudge.edge.ui.components.computeHudOuterSpanDp
 import kotlin.math.ceil
 
-private enum class SettingsTab(
-    val label: String,
-    val icon: ImageVector
-) {
-    SLIDER_HUD("Slider HUD", Icons.AutoMirrored.Rounded.VolumeUp),
-    SETTINGS("Settings", Icons.Rounded.Settings)
-}
-
 @Composable
 fun MainScreen(
     settings: NudgeSettings,
@@ -78,7 +62,6 @@ fun MainScreen(
     showAccessibilityPrompt: Boolean = false,
     onDismissAccessibilityPrompt: () -> Unit = {}
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.SLIDER_HUD) }
     var localModalVisible by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -94,8 +77,7 @@ fun MainScreen(
         }
     }
 
-    val hudScrollState = rememberScrollState()
-    val systemScrollState = rememberScrollState()
+    val settingsScrollState = rememberScrollState()
     val portraitAxisDp = maxOf(realScreenWidthDp, realScreenHeightDp)
     val landscapeAxisDp = minOf(realScreenWidthDp, realScreenHeightDp)
     val isLandscapeScreen = realScreenWidthDp > realScreenHeightDp
@@ -135,16 +117,13 @@ fun MainScreen(
                 }
 
                 SettingsCardPane(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
                     settings = settings,
                     portraitAxisDp = portraitAxisDp,
                     landscapeAxisDp = landscapeAxisDp,
                     musicMaxVolume = musicMaxVolume,
                     serviceActive = serviceActive,
                     repository = repository,
-                    hudScrollState = hudScrollState,
-                    systemScrollState = systemScrollState,
+                    scrollState = settingsScrollState,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                     cardShape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
                     modifier = Modifier
@@ -181,16 +160,13 @@ fun MainScreen(
                 }
 
                 SettingsCardPane(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
                     settings = settings,
                     portraitAxisDp = portraitAxisDp,
                     landscapeAxisDp = landscapeAxisDp,
                     musicMaxVolume = musicMaxVolume,
                     serviceActive = serviceActive,
                     repository = repository,
-                    hudScrollState = hudScrollState,
-                    systemScrollState = systemScrollState,
+                    scrollState = settingsScrollState,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                     cardShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                     modifier = Modifier
@@ -298,16 +274,13 @@ fun MainScreen(
 
 @Composable
 private fun SettingsCardPane(
-    selectedTab: SettingsTab,
-    onTabSelected: (SettingsTab) -> Unit,
     settings: NudgeSettings,
     portraitAxisDp: Float,
     landscapeAxisDp: Float,
     musicMaxVolume: Int,
     serviceActive: Boolean,
     repository: SettingsRepository,
-    hudScrollState: androidx.compose.foundation.ScrollState,
-    systemScrollState: androidx.compose.foundation.ScrollState,
+    scrollState: androidx.compose.foundation.ScrollState,
     onOpenAccessibilitySettings: () -> Unit,
     cardShape: RoundedCornerShape,
     modifier: Modifier = Modifier
@@ -318,57 +291,20 @@ private fun SettingsCardPane(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 2.dp
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            val activeScrollState = when (selectedTab) {
-                SettingsTab.SLIDER_HUD -> hudScrollState
-                SettingsTab.SETTINGS -> systemScrollState
-            }
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(activeScrollState)
-            ) {
-                when (selectedTab) {
-                    SettingsTab.SLIDER_HUD -> SliderHudTab(
-                        settings = settings,
-                        portraitAxisDp = portraitAxisDp,
-                        landscapeAxisDp = landscapeAxisDp,
-                        musicMaxVolume = musicMaxVolume,
-                        repository = repository
-                    )
-                    SettingsTab.SETTINGS -> SystemTab(
-                        settings = settings,
-                        serviceActive = serviceActive,
-                        repository = repository,
-                        onOpenAccessibilitySettings = onOpenAccessibilitySettings
-                    )
-                }
-            }
-
-            NavigationBar {
-                SettingsTab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { onTabSelected(tab) },
-                        icon = {
-                            Icon(
-                                imageVector = tab.icon,
-                                contentDescription = tab.label
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = tab.label,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    )
-                }
-            }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+        ) {
+            SettingsPage(
+                settings = settings,
+                portraitAxisDp = portraitAxisDp,
+                landscapeAxisDp = landscapeAxisDp,
+                musicMaxVolume = musicMaxVolume,
+                serviceActive = serviceActive,
+                repository = repository,
+                onOpenAccessibilitySettings = onOpenAccessibilitySettings
+            )
         }
     }
 }

@@ -13,11 +13,11 @@ import androidx.compose.ui.platform.LocalContext
 // near-black panes, and dark-grey cards that step up slightly when raised or selected.
 // Accent colours still come from the system (wallpaper / Samsung palette).
 private val AmoledBlack = Color(0xFF000000)
-private val AmoledPane = Color(0xFF080809)
-private val AmoledCard = Color(0xFF1A1A1D)
-private val AmoledRaised = Color(0xFF242428)
-private val AmoledHighest = Color(0xFF2E2E33)
-private val AmoledOutline = Color(0xFF3A3A40)
+private val AmoledPane = Color(0xFF050506)
+private val AmoledCard = Color(0xFF111113)
+private val AmoledRaised = Color(0xFF19191C)
+private val AmoledHighest = Color(0xFF232327)
+private val AmoledOutline = Color(0xFF2B2B30)
 
 private fun ColorScheme.asAmoled(): ColorScheme = copy(
     background = AmoledBlack,

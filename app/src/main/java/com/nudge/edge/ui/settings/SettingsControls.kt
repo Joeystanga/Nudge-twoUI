@@ -1,5 +1,11 @@
 package com.nudge.edge.ui.settings
 
+import android.content.pm.PackageManager
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.nudge.edge.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -47,12 +53,14 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
-fun SliderHudTab(
+fun SettingsPage(
     settings: NudgeSettings,
     portraitAxisDp: Float,
     landscapeAxisDp: Float,
     musicMaxVolume: Int,
-    repository: SettingsRepository
+    serviceActive: Boolean,
+    repository: SettingsRepository,
+    onOpenAccessibilitySettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -60,74 +68,53 @@ fun SliderHudTab(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-            onClick = { repository.setEnableVolumeSliderHud(!settings.enableVolumeSliderHud) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Enable Volume Slider HUD",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = settings.enableVolumeSliderHud,
-                    onCheckedChange = repository::setEnableVolumeSliderHud
-                )
-            }
-        }
+        SectionHeader("Design")
+        DesignSection(
+            settings = settings,
+            portraitAxisDp = portraitAxisDp,
+            landscapeAxisDp = landscapeAxisDp,
+            repository = repository
+        )
 
-        AnimatedVisibility(
-            visible = !settings.enableVolumeSliderHud,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                onClick = {
-                    repository.setShowSystemPanelWhenHudOff(!settings.showSystemPanelWhenHudOff)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Show Standard System Volume Slider",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Switch(
-                        checked = settings.showSystemPanelWhenHudOff,
-                        onCheckedChange = repository::setShowSystemPanelWhenHudOff
-                    )
-                }
-            }
-        }
+        SectionHeader("Theme")
+        ThemeSection(settings = settings, repository = repository)
 
+        SectionHeader("Behavior")
+        BehaviorSection(
+            settings = settings,
+            musicMaxVolume = musicMaxVolume,
+            repository = repository
+        )
+
+        SectionHeader("App")
+        AppSection(
+            serviceActive = serviceActive,
+            onOpenAccessibilitySettings = onOpenAccessibilitySettings
+        )
+
+        Spacer(modifier = Modifier.navigationBarsPadding())
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 8.dp, top = 12.dp)
+    )
+}
+
+@Composable
+private fun DesignSection(
+    settings: NudgeSettings,
+    portraitAxisDp: Float,
+    landscapeAxisDp: Float,
+    repository: SettingsRepository
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AnimatedVisibility(
             visible = settings.enableVolumeSliderHud,
             enter = fadeIn() + expandVertically(),
@@ -301,70 +288,6 @@ fun SliderHudTab(
                         repository.setHudCornerRadiusDp(minOf(effectiveCornerDp + 1f, maxCornerDp))
                     },
                     stepDescription = "0 to ${maxCornerDp.roundToInt()} dp (1 dp step)"
-                )
-
-                StepperSliderCard(
-                    title = "Auto-Hide Timeout",
-                    valueLabel = formatTimeoutLabel(settings.hudAutoHideMs),
-                    value = settings.hudAutoHideMs.toFloat(),
-                    valueRange = NudgeSettings.MIN_AUTO_HIDE_MS.toFloat()..NudgeSettings.MAX_AUTO_HIDE_MS.toFloat(),
-                    onValueChange = { raw ->
-                        val snapped = ((raw / NudgeSettings.AUTO_HIDE_STEP_MS.toFloat()).roundToInt() *
-                            NudgeSettings.AUTO_HIDE_STEP_MS)
-                        repository.setHudAutoHideMs(snapped)
-                    },
-                    onStepDown = {
-                        repository.setHudAutoHideMs(
-                            settings.hudAutoHideMs - NudgeSettings.AUTO_HIDE_STEP_MS
-                        )
-                    },
-                    onStepUp = {
-                        repository.setHudAutoHideMs(
-                            settings.hudAutoHideMs + NudgeSettings.AUTO_HIDE_STEP_MS
-                        )
-                    },
-                    stepDescription = "50 ms step"
-                )
-            }
-        }
-
-        StepperSliderCard(
-            title = "Volume Step",
-            valueLabel = "${settings.volumeStep} ${if (settings.volumeStep == 1) "step" else "steps"}",
-            value = settings.volumeStep.toFloat(),
-            valueRange = NudgeSettings.MIN_VOLUME_STEP.toFloat()..NudgeSettings.MAX_VOLUME_STEP.toFloat(),
-            onValueChange = { repository.setVolumeStep(it.roundToInt()) },
-            onStepDown = { repository.setVolumeStep(settings.volumeStep - 1) },
-            onStepUp = { repository.setVolumeStep(settings.volumeStep + 1) },
-            stepDescription = null
-        )
-
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Tune,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    text = "Detected Device Scale: 0 \u2013 $musicMaxVolume steps",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -555,18 +478,275 @@ fun SliderHudTab(
 }
 
 @Composable
-fun SystemTab(
+private fun ThemeSection(
     settings: NudgeSettings,
+    repository: SettingsRepository
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            onClick = { repository.setLightMode(!settings.lightMode) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.LightMode,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column {
+                        Text(
+                            text = "Light Mode",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Light theme for app & mixer",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = settings.lightMode,
+                    onCheckedChange = repository::setLightMode
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BehaviorSection(
+    settings: NudgeSettings,
+    musicMaxVolume: Int,
+    repository: SettingsRepository
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            onClick = { repository.setEnableVolumeSliderHud(!settings.enableVolumeSliderHud) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Enable Volume Slider HUD",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = settings.enableVolumeSliderHud,
+                    onCheckedChange = repository::setEnableVolumeSliderHud
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !settings.enableVolumeSliderHud,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                onClick = {
+                    repository.setShowSystemPanelWhenHudOff(!settings.showSystemPanelWhenHudOff)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Show Standard System Volume Slider",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = settings.showSystemPanelWhenHudOff,
+                        onCheckedChange = repository::setShowSystemPanelWhenHudOff
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = settings.enableVolumeSliderHud,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            StepperSliderCard(
+                title = "Auto-Hide Timeout",
+                valueLabel = formatTimeoutLabel(settings.hudAutoHideMs),
+                value = settings.hudAutoHideMs.toFloat(),
+                valueRange = NudgeSettings.MIN_AUTO_HIDE_MS.toFloat()..NudgeSettings.MAX_AUTO_HIDE_MS.toFloat(),
+                onValueChange = { raw ->
+                    val snapped = ((raw / NudgeSettings.AUTO_HIDE_STEP_MS.toFloat()).roundToInt() *
+                        NudgeSettings.AUTO_HIDE_STEP_MS)
+                    repository.setHudAutoHideMs(snapped)
+                },
+                onStepDown = {
+                    repository.setHudAutoHideMs(
+                        settings.hudAutoHideMs - NudgeSettings.AUTO_HIDE_STEP_MS
+                    )
+                },
+                onStepUp = {
+                    repository.setHudAutoHideMs(
+                        settings.hudAutoHideMs + NudgeSettings.AUTO_HIDE_STEP_MS
+                    )
+                },
+                stepDescription = "50 ms step"
+            )
+        }
+
+        StepperSliderCard(
+            title = "Volume Step",
+            valueLabel = "${settings.volumeStep} ${if (settings.volumeStep == 1) "step" else "steps"}",
+            value = settings.volumeStep.toFloat(),
+            valueRange = NudgeSettings.MIN_VOLUME_STEP.toFloat()..NudgeSettings.MAX_VOLUME_STEP.toFloat(),
+            onValueChange = { repository.setVolumeStep(it.roundToInt()) },
+            onStepDown = { repository.setVolumeStep(settings.volumeStep - 1) },
+            onStepUp = { repository.setVolumeStep(settings.volumeStep + 1) },
+            stepDescription = null
+        )
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Detected Device Scale: 0 \u2013 $musicMaxVolume steps",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            onClick = { repository.setHapticsEnabled(!settings.hapticsEnabled) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Vibration,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column {
+                        Text(
+                            text = "Haptics on Button Press",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Haptic click on keys & gestures",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = settings.hapticsEnabled,
+                    onCheckedChange = repository::setHapticsEnabled
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppSection(
     serviceActive: Boolean,
-    repository: SettingsRepository,
     onOpenAccessibilitySettings: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    val context = LocalContext.current
+    val versionName = remember {
+        runCatching {
+            context.packageManager
+                .getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0L))
+                .versionName
+        }.getOrNull() ?: "unknown"
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
@@ -652,99 +832,29 @@ fun SystemTab(
         Surface(
             shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            onClick = { repository.setLightMode(!settings.lightMode) },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.LightMode,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Column {
-                        Text(
-                            text = "Light Mode",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Light theme for app & mixer",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = settings.lightMode,
-                    onCheckedChange = repository::setLightMode
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
-        }
-
-        Surface(
-            shape = RoundedCornerShape(22.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            onClick = { repository.setHapticsEnabled(!settings.hapticsEnabled) },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Vibration,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Column {
-                        Text(
-                            text = "Haptics on Button Press",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Haptic click on keys & gestures",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Switch(
-                    checked = settings.hapticsEnabled,
-                    onCheckedChange = repository::setHapticsEnabled
+                Text(
+                    text = "Version $versionName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Based on Nudge by DarkAspect (MIT License)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
