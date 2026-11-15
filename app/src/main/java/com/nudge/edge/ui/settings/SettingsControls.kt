@@ -1,5 +1,21 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.hudPaletteSpec
+import com.nudge.edge.ui.components.hudFillBrush
+import com.nudge.edge.model.HudPaletteId
+import androidx.compose.material3.RadioButton
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.graphics.Color
@@ -566,6 +582,84 @@ private fun ThemeSection(
         Surface(
             shape = RectangleShape,
             color = Color.Transparent,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Bar Colour",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Lighting style for the volume slider",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    HudPaletteId.entries.forEach { id ->
+                        PaletteSwatch(
+                            id = id,
+                            selected = id == settings.hudPalette,
+                            onSelect = { repository.setHudPalette(id) }
+                        )
+                    }
+                }
+            }
+        }
+
+        GroupDivider()
+
+        AnimatedVisibility(
+            visible = settings.hudPalette != HudPaletteId.CLASSIC,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Column {
+                SwitchRow(
+                    title = "Gradient",
+                    subtitle = if (settings.hudUseGradient) "Colours blend along the bar" else "Flat single shade",
+                    checked = settings.hudUseGradient,
+                    onCheckedChange = repository::setHudUseGradient
+                )
+
+                GroupDivider()
+
+                AnimatedVisibility(
+                    visible = settings.hudUseGradient,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        SwitchRow(
+                            title = "Animate Gradient",
+                            subtitle = "Colours drift slowly while the bar is showing",
+                            checked = settings.hudAnimateGradient,
+                            onCheckedChange = repository::setHudAnimateGradient
+                        )
+
+                        GroupDivider()
+                    }
+                }
+            }
+        }
+
+        Surface(
+            shape = RectangleShape,
+            color = Color.Transparent,
             onClick = { repository.setLightMode(!settings.lightMode) },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -612,6 +706,102 @@ private fun ThemeSection(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Surface(
+        shape = RectangleShape,
+        color = Color.Transparent,
+        onClick = { onCheckedChange(!checked) },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun PaletteSwatch(
+    id: HudPaletteId,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    val spec = remember(id) { hudPaletteSpec(id) }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Canvas(modifier = Modifier.size(width = 40.dp, height = 88.dp)) {
+            val radius = size.width / 2f
+            val shape = Path().apply {
+                addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(radius, radius)))
+            }
+            clipPath(shape) {
+                drawRect(color = Color(0xFF2C2C2E))
+                val brush = hudFillBrush(
+                    spec = spec,
+                    useGradient = true,
+                    start = Offset(size.width / 2f, size.height),
+                    end = Offset(size.width / 2f, 0f),
+                    shift = 0f
+                )
+                if (!spec.isClassic) {
+                    drawRect(brush = brush, alpha = 0.26f)
+                }
+                drawRect(
+                    brush = brush,
+                    topLeft = Offset(0f, size.height * 0.38f),
+                    size = Size(size.width, size.height * 0.62f)
+                )
+            }
+        }
+        Text(
+            text = spec.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        RadioButton(selected = selected, onClick = null)
     }
 }
 

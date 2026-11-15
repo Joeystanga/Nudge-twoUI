@@ -1,5 +1,7 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.hudPaletteSpec
+import com.nudge.edge.ui.components.hudFillBrush
 import com.nudge.edge.ui.components.drawHudMenuButton
 import com.nudge.edge.ui.components.computeHudMenuExtraDp
 import com.nudge.edge.ui.components.HUD_MENU_BUTTON_GAP_DP
@@ -228,6 +230,7 @@ fun DevicePreviewCanvas(
                     if (hudAllowed) {
                         val hudIsVertical = hudScreenEdge == ScreenEdge.LEFT ||
                             hudScreenEdge == ScreenEdge.RIGHT
+                        val paletteSpec = hudPaletteSpec(settings.hudPalette)
                         val pillW = settings.hudWidthDp * scale
                         val pillSpan = computeHudDrawnPillSpanDp(settings.hudHeightDp) * scale
                         val cutoutThickness = computeHudCutoutThicknessDp(settings.hudWidthDp, previewInsetDp) * scale
@@ -308,10 +311,25 @@ fun DevicePreviewCanvas(
                             }
 
                             val fillTop = (pillBottom - pillSpan * musicVolumeFraction).coerceIn(pillTop, pillBottom)
+                            val fillBrush = hudFillBrush(
+                                spec = paletteSpec,
+                                useGradient = settings.hudUseGradient,
+                                start = Offset(pillCenterX, pillBottom),
+                                end = Offset(pillCenterX, pillTop),
+                                shift = 0f
+                            )
                             clipPath(pillPath) {
+                                if (!paletteSpec.isClassic) {
+                                    drawRect(
+                                        brush = fillBrush,
+                                        topLeft = Offset(pillLeft, pillTop),
+                                        size = Size(pillW, pillSpan),
+                                        alpha = 0.26f
+                                    )
+                                }
                                 if (musicVolumeFraction > 0.01f) {
                                     drawRect(
-                                        color = Color.White,
+                                        brush = fillBrush,
                                         topLeft = Offset(pillLeft, fillTop),
                                         size = Size(pillW, pillBottom - fillTop)
                                     )
@@ -335,10 +353,10 @@ fun DevicePreviewCanvas(
                                         drawSpeakerGlyph(
                                             center = glyphCenter,
                                             glyphSize = glyphSize,
-                                            color = Color(0xFF6E6E73),
+                                            color = paletteSpec.iconOnFill,
                                             volumeFraction = musicVolumeFraction,
                                             pathBuffer = speakerPath,
-                                            cutoutColor = Color.White
+                                            cutoutColor = paletteSpec.flat
                                         )
                                     }
                                 }
@@ -395,10 +413,25 @@ fun DevicePreviewCanvas(
                             }
 
                             val fillRight = (pillLeft + pillSpan * musicVolumeFraction).coerceIn(pillLeft, pillRight)
+                            val fillBrush = hudFillBrush(
+                                spec = paletteSpec,
+                                useGradient = settings.hudUseGradient,
+                                start = Offset(pillLeft, pillCenterY),
+                                end = Offset(pillRight, pillCenterY),
+                                shift = 0f
+                            )
                             clipPath(pillPath) {
+                                if (!paletteSpec.isClassic) {
+                                    drawRect(
+                                        brush = fillBrush,
+                                        topLeft = Offset(pillLeft, pillTop),
+                                        size = Size(pillSpan, pillW),
+                                        alpha = 0.26f
+                                    )
+                                }
                                 if (musicVolumeFraction > 0.01f) {
                                     drawRect(
-                                        color = Color.White,
+                                        brush = fillBrush,
                                         topLeft = Offset(pillLeft, pillTop),
                                         size = Size(fillRight - pillLeft, pillW)
                                     )
@@ -410,10 +443,10 @@ fun DevicePreviewCanvas(
                                         drawSpeakerGlyph(
                                             center = glyphCenter,
                                             glyphSize = glyphSize,
-                                            color = Color(0xFF6E6E73),
+                                            color = paletteSpec.iconOnFill,
                                             volumeFraction = musicVolumeFraction,
                                             pathBuffer = speakerPath,
-                                            cutoutColor = Color.White
+                                            cutoutColor = paletteSpec.flat
                                         )
                                     }
                                 }

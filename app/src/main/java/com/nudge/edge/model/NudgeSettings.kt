@@ -12,6 +12,15 @@ enum class ScreenEdge {
     BOTTOM
 }
 
+enum class HudPaletteId {
+    CLASSIC,
+    MONO,
+    AURORA,
+    LAGOON,
+    EMBER,
+    SAKURA
+}
+
 enum class PreviewTarget {
     NONE,
     HUD
@@ -33,6 +42,9 @@ data class NudgeSettings(
     val showSystemPanelInLandscape: Boolean = true,
     val floatingMode: Boolean = false,
     val showMenuButton: Boolean = true,
+    val hudPalette: HudPaletteId = HudPaletteId.CLASSIC,
+    val hudUseGradient: Boolean = true,
+    val hudAnimateGradient: Boolean = false,
     val hudEdgeInsetDp: Float = 0f,
     val hapticsEnabled: Boolean = true,
     val lightMode: Boolean = false

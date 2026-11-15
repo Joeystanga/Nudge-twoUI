@@ -1,5 +1,6 @@
 package com.nudge.edge.ui.components
 
+import com.nudge.edge.model.HudPaletteId
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -50,8 +51,6 @@ import kotlin.math.sin
 
 private val HudHousingBlack = Color(0xFF000000)
 private val HudTrackCharcoal = Color(0xFF2C2C2E)
-private val HudFillWhite = Color(0xFFFFFFFF)
-private val HudIconOnWhite = Color(0xFF6E6E73)
 private val HudIconOnDark = Color(0xFFFFFFFF)
 
 private const val SLOPE_ANGLE_RAD = 75.0 * PI / 180.0
@@ -396,6 +395,9 @@ fun VolumeSliderHud(
     volumeFraction: Float,
     isVisible: Boolean,
     showMenuButton: Boolean = false,
+    palette: HudPaletteId = HudPaletteId.CLASSIC,
+    useGradient: Boolean = true,
+    animateGradient: Boolean = false,
     resetEpoch: Int = 0,
     onVolumeScrub: (Float) -> Unit,
     onScrubStateChanged: (Boolean) -> Unit,
@@ -409,6 +411,20 @@ fun VolumeSliderHud(
     val housingPath = remember { Path() }
     val pillPath = remember { Path() }
     val speakerPath = remember { Path() }
+    val paletteSpec = remember(palette) { hudPaletteSpec(palette) }
+    val gradientShift = remember { Animatable(0f) }
+    val gradientAnimating = animateGradient && useGradient && isVisible && !paletteSpec.isClassic
+    LaunchedEffect(gradientAnimating) {
+        if (gradientAnimating) {
+            while (true) {
+                gradientShift.snapTo(0f)
+                gradientShift.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 6000, easing = LinearEasing)
+                )
+            }
+        }
+    }
 
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(volumeFraction.coerceIn(0f, 1f)) }
@@ -678,10 +694,26 @@ fun VolumeSliderHud(
 
                 val fillTop = (pillBottom - pillSpan * displayedFraction).coerceIn(pillTop, pillBottom)
 
+                val fillBrush = hudFillBrush(
+                    spec = paletteSpec,
+                    useGradient = useGradient,
+                    start = Offset(pillCenterX, pillBottom),
+                    end = Offset(pillCenterX, pillTop),
+                    shift = gradientShift.value
+                )
+
                 clipPath(pillPath) {
+                    if (!paletteSpec.isClassic) {
+                        drawRect(
+                            brush = fillBrush,
+                            topLeft = Offset(pillLeft, pillTop),
+                            size = Size(pillW, pillSpan),
+                            alpha = 0.26f
+                        )
+                    }
                     if (displayedFraction > 0.002f) {
                         drawRect(
-                            color = HudFillWhite,
+                            brush = fillBrush,
                             topLeft = Offset(pillLeft, fillTop),
                             size = Size(pillW, pillBottom - fillTop)
                         )
@@ -708,10 +740,10 @@ fun VolumeSliderHud(
                             drawSpeakerGlyph(
                                 center = iconCenter,
                                 glyphSize = iconSize,
-                                color = HudIconOnWhite,
+                                color = paletteSpec.iconOnFill,
                                 volumeFraction = displayedFraction,
                                 pathBuffer = speakerPath,
-                                cutoutColor = HudFillWhite
+                                cutoutColor = paletteSpec.flat
                             )
                         }
                     }
@@ -772,10 +804,26 @@ fun VolumeSliderHud(
 
                 val fillRight = (pillLeft + pillSpan * displayedFraction).coerceIn(pillLeft, pillRight)
 
+                val fillBrush = hudFillBrush(
+                    spec = paletteSpec,
+                    useGradient = useGradient,
+                    start = Offset(pillLeft, pillCenterY),
+                    end = Offset(pillRight, pillCenterY),
+                    shift = gradientShift.value
+                )
+
                 clipPath(pillPath) {
+                    if (!paletteSpec.isClassic) {
+                        drawRect(
+                            brush = fillBrush,
+                            topLeft = Offset(pillLeft, pillTop),
+                            size = Size(pillSpan, pillW),
+                            alpha = 0.26f
+                        )
+                    }
                     if (displayedFraction > 0.002f) {
                         drawRect(
-                            color = HudFillWhite,
+                            brush = fillBrush,
                             topLeft = Offset(pillLeft, pillTop),
                             size = Size(fillRight - pillLeft, pillW)
                         )
@@ -790,10 +838,10 @@ fun VolumeSliderHud(
                             drawSpeakerGlyph(
                                 center = iconCenter,
                                 glyphSize = iconSize,
-                                color = HudIconOnWhite,
+                                color = paletteSpec.iconOnFill,
                                 volumeFraction = displayedFraction,
                                 pathBuffer = speakerPath,
-                                cutoutColor = HudFillWhite
+                                cutoutColor = paletteSpec.flat
                             )
                         }
                     }

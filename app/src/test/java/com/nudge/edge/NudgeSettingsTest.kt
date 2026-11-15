@@ -1,5 +1,7 @@
 package com.nudge.edge
 
+import com.nudge.edge.ui.components.hudPaletteSpec
+import com.nudge.edge.model.HudPaletteId
 import com.nudge.edge.ui.components.computeHudMenuExtraDp
 import com.nudge.edge.ui.components.HUD_MENU_BUTTON_GAP_DP
 import android.view.Surface
@@ -233,5 +235,17 @@ class NudgeSettingsTest {
         val base = computeHudOuterSpanDp(155f)
         assertEquals(base + 53f, computeHudOuterSpanDp(155f, 53f), 0.001f)
         assertTrue(NudgeSettings().showMenuButton)
+    }
+
+    @Test
+    fun everyPaletteHasUsableColours() {
+        assertEquals(HudPaletteId.CLASSIC, NudgeSettings().hudPalette)
+        HudPaletteId.entries.forEach { id ->
+            val spec = hudPaletteSpec(id)
+            assertTrue(spec.label.isNotBlank())
+            assertTrue(spec.stops.size >= 2)
+        }
+        assertTrue(hudPaletteSpec(HudPaletteId.CLASSIC).isClassic)
+        assertFalse(hudPaletteSpec(HudPaletteId.AURORA).isClassic)
     }
 }

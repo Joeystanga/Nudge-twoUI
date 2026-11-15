@@ -1,5 +1,6 @@
 package com.nudge.edge.data
 
+import com.nudge.edge.model.HudPaletteId
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -51,6 +52,9 @@ class SettingsRepository private constructor(context: Context) {
         val SHOW_SYSTEM_PANEL_LANDSCAPE = booleanPreferencesKey("show_system_panel_landscape")
         val FLOATING_MODE = booleanPreferencesKey("floating_mode")
         val SHOW_MENU_BUTTON = booleanPreferencesKey("show_menu_button")
+        val HUD_PALETTE = stringPreferencesKey("hud_palette")
+        val HUD_USE_GRADIENT = booleanPreferencesKey("hud_use_gradient")
+        val HUD_ANIMATE_GRADIENT = booleanPreferencesKey("hud_animate_gradient")
         val HUD_EDGE_INSET_DP = floatPreferencesKey("hud_edge_inset_dp")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
         val LIGHT_MODE = booleanPreferencesKey("light_mode")
@@ -124,6 +128,11 @@ class SettingsRepository private constructor(context: Context) {
                 prefs[Keys.SHOW_SYSTEM_PANEL_LANDSCAPE] ?: defaults.showSystemPanelInLandscape,
             floatingMode = prefs[Keys.FLOATING_MODE] ?: defaults.floatingMode,
             showMenuButton = prefs[Keys.SHOW_MENU_BUTTON] ?: defaults.showMenuButton,
+            hudPalette = prefs[Keys.HUD_PALETTE]?.let {
+                runCatching { HudPaletteId.valueOf(it) }.getOrNull()
+            } ?: defaults.hudPalette,
+            hudUseGradient = prefs[Keys.HUD_USE_GRADIENT] ?: defaults.hudUseGradient,
+            hudAnimateGradient = prefs[Keys.HUD_ANIMATE_GRADIENT] ?: defaults.hudAnimateGradient,
             hudEdgeInsetDp = NudgeSettings.clampHudEdgeInset(
                 prefs[Keys.HUD_EDGE_INSET_DP] ?: defaults.hudEdgeInsetDp
             ),
@@ -292,6 +301,33 @@ class SettingsRepository private constructor(context: Context) {
         requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
         scope.launch {
             appContext.nudgeDataStore.edit { it[Keys.SHOW_MENU_BUTTON] = show }
+        }
+    }
+
+    fun setHudPalette(palette: HudPaletteId) {
+        if (_settings.value.hudPalette == palette) return
+        _settings.value = _settings.value.copy(hudPalette = palette)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_PALETTE] = palette.name }
+        }
+    }
+
+    fun setHudUseGradient(enabled: Boolean) {
+        if (_settings.value.hudUseGradient == enabled) return
+        _settings.value = _settings.value.copy(hudUseGradient = enabled)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_USE_GRADIENT] = enabled }
+        }
+    }
+
+    fun setHudAnimateGradient(enabled: Boolean) {
+        if (_settings.value.hudAnimateGradient == enabled) return
+        _settings.value = _settings.value.copy(hudAnimateGradient = enabled)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_ANIMATE_GRADIENT] = enabled }
         }
     }
 
