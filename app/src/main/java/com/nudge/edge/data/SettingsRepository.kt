@@ -1,5 +1,6 @@
 package com.nudge.edge.data
 
+import com.nudge.edge.model.HudTextureId
 import com.nudge.edge.model.HudPaletteId
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -55,6 +56,9 @@ class SettingsRepository private constructor(context: Context) {
         val HUD_PALETTE = stringPreferencesKey("hud_palette")
         val HUD_USE_GRADIENT = booleanPreferencesKey("hud_use_gradient")
         val HUD_ANIMATE_GRADIENT = booleanPreferencesKey("hud_animate_gradient")
+        val HUD_COLOR_INTENSITY = floatPreferencesKey("hud_color_intensity")
+        val HUD_TEXTURE = stringPreferencesKey("hud_texture")
+        val HUD_BORDER_WIDTH_DP = floatPreferencesKey("hud_border_width_dp")
         val HUD_EDGE_INSET_DP = floatPreferencesKey("hud_edge_inset_dp")
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
         val LIGHT_MODE = booleanPreferencesKey("light_mode")
@@ -133,6 +137,15 @@ class SettingsRepository private constructor(context: Context) {
             } ?: defaults.hudPalette,
             hudUseGradient = prefs[Keys.HUD_USE_GRADIENT] ?: defaults.hudUseGradient,
             hudAnimateGradient = prefs[Keys.HUD_ANIMATE_GRADIENT] ?: defaults.hudAnimateGradient,
+            hudColorIntensity = NudgeSettings.clampColorIntensity(
+                prefs[Keys.HUD_COLOR_INTENSITY] ?: defaults.hudColorIntensity
+            ),
+            hudTexture = prefs[Keys.HUD_TEXTURE]?.let {
+                runCatching { HudTextureId.valueOf(it) }.getOrNull()
+            } ?: defaults.hudTexture,
+            hudBorderWidthDp = NudgeSettings.clampHudBorder(
+                prefs[Keys.HUD_BORDER_WIDTH_DP] ?: defaults.hudBorderWidthDp
+            ),
             hudEdgeInsetDp = NudgeSettings.clampHudEdgeInset(
                 prefs[Keys.HUD_EDGE_INSET_DP] ?: defaults.hudEdgeInsetDp
             ),
@@ -328,6 +341,35 @@ class SettingsRepository private constructor(context: Context) {
         requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
         scope.launch {
             appContext.nudgeDataStore.edit { it[Keys.HUD_ANIMATE_GRADIENT] = enabled }
+        }
+    }
+
+    fun setHudColorIntensity(value: Float) {
+        val clamped = NudgeSettings.clampColorIntensity(value)
+        if (_settings.value.hudColorIntensity == clamped) return
+        _settings.value = _settings.value.copy(hudColorIntensity = clamped)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_COLOR_INTENSITY] = clamped }
+        }
+    }
+
+    fun setHudTexture(texture: HudTextureId) {
+        if (_settings.value.hudTexture == texture) return
+        _settings.value = _settings.value.copy(hudTexture = texture)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_TEXTURE] = texture.name }
+        }
+    }
+
+    fun setHudBorderWidthDp(value: Float) {
+        val clamped = NudgeSettings.clampHudBorder(value)
+        if (_settings.value.hudBorderWidthDp == clamped) return
+        _settings.value = _settings.value.copy(hudBorderWidthDp = clamped)
+        requestLivePreview(PreviewTarget.HUD, durationMs = 2400L)
+        scope.launch {
+            appContext.nudgeDataStore.edit { it[Keys.HUD_BORDER_WIDTH_DP] = clamped }
         }
     }
 

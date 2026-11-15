@@ -1,5 +1,6 @@
 package com.nudge.edge
 
+import androidx.compose.ui.graphics.Color
 import com.nudge.edge.ui.components.hudPaletteSpec
 import com.nudge.edge.model.HudPaletteId
 import com.nudge.edge.ui.components.computeHudMenuExtraDp
@@ -247,5 +248,17 @@ class NudgeSettingsTest {
         }
         assertTrue(hudPaletteSpec(HudPaletteId.CLASSIC).isClassic)
         assertFalse(hudPaletteSpec(HudPaletteId.AURORA).isClassic)
+    }
+
+    @Test
+    fun softerIntensityGivesLessSaturatedColours() {
+        fun spread(c: Color) = maxOf(c.red, c.green, c.blue) - minOf(c.red, c.green, c.blue)
+        val full = hudPaletteSpec(HudPaletteId.AURORA, 1f).flat
+        val soft = hudPaletteSpec(HudPaletteId.AURORA, 0.5f).flat
+        assertTrue(spread(soft) < spread(full))
+        assertEquals(1f, NudgeSettings.clampColorIntensity(2f), 0.001f)
+        assertEquals(0.30f, NudgeSettings.clampColorIntensity(0f), 0.001f)
+        assertEquals(3f, NudgeSettings.clampHudBorder(9f), 0.001f)
+        assertEquals(0f, NudgeSettings().hudBorderWidthDp, 0.001f)
     }
 }

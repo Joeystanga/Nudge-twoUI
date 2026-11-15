@@ -21,6 +21,12 @@ enum class HudPaletteId {
     SAKURA
 }
 
+enum class HudTextureId {
+    NONE,
+    ACRYLIC,
+    MESH
+}
+
 enum class PreviewTarget {
     NONE,
     HUD
@@ -45,6 +51,9 @@ data class NudgeSettings(
     val hudPalette: HudPaletteId = HudPaletteId.CLASSIC,
     val hudUseGradient: Boolean = true,
     val hudAnimateGradient: Boolean = false,
+    val hudColorIntensity: Float = 0.65f,
+    val hudTexture: HudTextureId = HudTextureId.NONE,
+    val hudBorderWidthDp: Float = 0f,
     val hudEdgeInsetDp: Float = 0f,
     val hapticsEnabled: Boolean = true,
     val lightMode: Boolean = false
@@ -63,6 +72,10 @@ data class NudgeSettings(
         const val MIN_AUTO_HIDE_MS = 250L
         const val MAX_AUTO_HIDE_MS = 5000L
         const val AUTO_HIDE_STEP_MS = 50L
+        const val MIN_COLOR_INTENSITY = 0.30f
+        const val MAX_COLOR_INTENSITY = 1.0f
+        const val MIN_HUD_BORDER_DP = 0f
+        const val MAX_HUD_BORDER_DP = 3f
 
         fun clampFraction(value: Float): Float = value.coerceIn(0f, 1f)
 
@@ -80,6 +93,12 @@ data class NudgeSettings(
 
         fun clampHudEdgeInset(value: Float): Float =
             value.coerceIn(MIN_HUD_EDGE_INSET_DP, MAX_HUD_EDGE_INSET_DP)
+
+        fun clampColorIntensity(value: Float): Float =
+            value.coerceIn(MIN_COLOR_INTENSITY, MAX_COLOR_INTENSITY)
+
+        fun clampHudBorder(value: Float): Float =
+            value.coerceIn(MIN_HUD_BORDER_DP, MAX_HUD_BORDER_DP)
 
         fun clampAutoHideMs(value: Long): Long =
             value.coerceIn(MIN_AUTO_HIDE_MS, MAX_AUTO_HIDE_MS)

@@ -1,5 +1,8 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.HudBorderColor
+import com.nudge.edge.ui.components.drawHudSurfaceFx
+import com.nudge.edge.ui.components.createHudTextureBrush
 import com.nudge.edge.ui.components.hudPaletteSpec
 import com.nudge.edge.ui.components.hudFillBrush
 import com.nudge.edge.ui.components.drawHudMenuButton
@@ -183,6 +186,9 @@ fun DevicePreviewCanvas(
     val pillPath = remember { Path() }
     val speakerPath = remember { Path() }
     val screenClipPath = remember { Path() }
+    val previewTextureBrush = remember(settings.hudTexture) {
+        createHudTextureBrush(settings.hudTexture, cellPx = 2.6f)
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -230,7 +236,7 @@ fun DevicePreviewCanvas(
                     if (hudAllowed) {
                         val hudIsVertical = hudScreenEdge == ScreenEdge.LEFT ||
                             hudScreenEdge == ScreenEdge.RIGHT
-                        val paletteSpec = hudPaletteSpec(settings.hudPalette)
+                        val paletteSpec = hudPaletteSpec(settings.hudPalette, settings.hudColorIntensity)
                         val pillW = settings.hudWidthDp * scale
                         val pillSpan = computeHudDrawnPillSpanDp(settings.hudHeightDp) * scale
                         val cutoutThickness = computeHudCutoutThicknessDp(settings.hudWidthDp, previewInsetDp) * scale
@@ -334,6 +340,24 @@ fun DevicePreviewCanvas(
                                         size = Size(pillW, pillBottom - fillTop)
                                     )
                                 }
+                                drawHudSurfaceFx(
+                                    texture = settings.hudTexture,
+                                    textureBrush = previewTextureBrush,
+                                    pillPath = pillPath,
+                                    topLeft = Offset(pillLeft, pillTop),
+                                    size = Size(pillW, pillSpan),
+                                    borderPx = settings.hudBorderWidthDp * scale,
+                                    borderColor = HudBorderColor
+                                )
+                                drawHudSurfaceFx(
+                                    texture = settings.hudTexture,
+                                    textureBrush = previewTextureBrush,
+                                    pillPath = pillPath,
+                                    topLeft = Offset(pillLeft, pillTop),
+                                    size = Size(pillSpan, pillW),
+                                    borderPx = settings.hudBorderWidthDp * scale,
+                                    borderColor = HudBorderColor
+                                )
                                 val glyphSize = (pillW * 0.45f).coerceAtLeast(3f)
                                 val glyphCenter = Offset(pillCenterX, pillBottom - pillW * 0.44f)
                                 if (fillTop > pillTop) {

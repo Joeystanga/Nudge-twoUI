@@ -1,5 +1,9 @@
 package com.nudge.edge.ui.settings
 
+import com.nudge.edge.ui.components.drawHudSurfaceFx
+import com.nudge.edge.ui.components.createHudTextureBrush
+import com.nudge.edge.model.HudTextureId
+import androidx.compose.ui.platform.LocalDensity
 import com.nudge.edge.ui.components.hudPaletteSpec
 import com.nudge.edge.ui.components.hudFillBrush
 import com.nudge.edge.model.HudPaletteId
@@ -613,6 +617,7 @@ private fun ThemeSection(
                     HudPaletteId.entries.forEach { id ->
                         PaletteSwatch(
                             id = id,
+                            intensity = settings.hudColorIntensity,
                             selected = id == settings.hudPalette,
                             onSelect = { repository.setHudPalette(id) }
                         )
@@ -629,6 +634,25 @@ private fun ThemeSection(
             exit = fadeOut() + shrinkVertically()
         ) {
             Column {
+                StepperSliderCard(
+                    title = "Colour Intensity",
+                    valueLabel = "${(settings.hudColorIntensity * 100f).roundToInt()}%",
+                    value = settings.hudColorIntensity,
+                    valueRange = NudgeSettings.MIN_COLOR_INTENSITY..NudgeSettings.MAX_COLOR_INTENSITY,
+                    onValueChange = { raw ->
+                        repository.setHudColorIntensity((raw * 20f).roundToInt() / 20f)
+                    },
+                    onStepDown = {
+                        repository.setHudColorIntensity(settings.hudColorIntensity - 0.05f)
+                    },
+                    onStepUp = {
+                        repository.setHudColorIntensity(settings.hudColorIntensity + 0.05f)
+                    },
+                    stepDescription = "Lower is softer and less bright"
+                )
+
+                GroupDivider()
+
                 SwitchRow(
                     title = "Gradient",
                     subtitle = if (settings.hudUseGradient) "Colours blend along the bar" else "Flat single shade",
@@ -656,6 +680,71 @@ private fun ThemeSection(
                 }
             }
         }
+
+        Surface(
+            shape = RectangleShape,
+            color = Color.Transparent,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Texture",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Surface finish of the slider bar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    HudTextureId.entries.forEach { texture ->
+                        TextureSwatch(
+                            texture = texture,
+                            palette = settings.hudPalette,
+                            intensity = settings.hudColorIntensity,
+                            selected = texture == settings.hudTexture,
+                            onSelect = { repository.setHudTexture(texture) }
+                        )
+                    }
+                }
+            }
+        }
+
+        GroupDivider()
+
+        StepperSliderCard(
+            title = "Border",
+            valueLabel = if (settings.hudBorderWidthDp <= 0f) "Off" else "${"%.1f".format(settings.hudBorderWidthDp)} dp",
+            value = settings.hudBorderWidthDp,
+            valueRange = NudgeSettings.MIN_HUD_BORDER_DP..NudgeSettings.MAX_HUD_BORDER_DP,
+            onValueChange = { raw ->
+                repository.setHudBorderWidthDp((raw * 2f).roundToInt() / 2f)
+            },
+            onStepDown = {
+                repository.setHudBorderWidthDp(settings.hudBorderWidthDp - 0.5f)
+            },
+            onStepUp = {
+                repository.setHudBorderWidthDp(settings.hudBorderWidthDp + 0.5f)
+            },
+            stepDescription = "Thin light edge around the bar (0.5 dp step)"
+        )
+
+        GroupDivider()
 
         Surface(
             shape = RectangleShape,
@@ -759,10 +848,11 @@ private fun SwitchRow(
 @Composable
 private fun PaletteSwatch(
     id: HudPaletteId,
+    intensity: Float,
     selected: Boolean,
     onSelect: () -> Unit
 ) {
-    val spec = remember(id) { hudPaletteSpec(id) }
+    val spec = remember(id, intensity) { hudPaletteSpec(id, intensity) }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -797,6 +887,66 @@ private fun PaletteSwatch(
         }
         Text(
             text = spec.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+        RadioButton(selected = selected, onClick = null)
+    }
+}
+
+@Composable
+private fun TextureSwatch(
+    texture: HudTextureId,
+    palette: HudPaletteId,
+    intensity: Float,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    val spec = remember(palette, intensity) { hudPaletteSpec(palette, intensity) }
+    val cellPx = with(LocalDensity.current) { 3.dp.toPx() }
+    val textureBrush = remember(texture, cellPx) { createHudTextureBrush(texture, cellPx) }
+    val label = when (texture) {
+        HudTextureId.NONE -> "None"
+        HudTextureId.ACRYLIC -> "Acrylic"
+        HudTextureId.MESH -> "Mesh"
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Canvas(modifier = Modifier.size(64.dp)) {
+            val radius = size.width * 0.28f
+            val shape = Path().apply {
+                addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(radius, radius)))
+            }
+            clipPath(shape) {
+                drawRect(color = Color(0xFF2C2C2E))
+                val brush = hudFillBrush(
+                    spec = spec,
+                    useGradient = true,
+                    start = Offset(0f, size.height),
+                    end = Offset(size.width, 0f),
+                    shift = 0f
+                )
+                drawRect(brush = brush)
+                drawHudSurfaceFx(
+                    texture = texture,
+                    textureBrush = textureBrush,
+                    pillPath = shape,
+                    topLeft = Offset.Zero,
+                    size = size,
+                    borderPx = 0f,
+                    borderColor = Color.Transparent
+                )
+            }
+        }
+        Text(
+            text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1

@@ -1,5 +1,6 @@
 package com.nudge.edge.ui.components
 
+import com.nudge.edge.model.HudTextureId
 import com.nudge.edge.model.HudPaletteId
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -398,6 +399,9 @@ fun VolumeSliderHud(
     palette: HudPaletteId = HudPaletteId.CLASSIC,
     useGradient: Boolean = true,
     animateGradient: Boolean = false,
+    colorIntensity: Float = 1f,
+    texture: HudTextureId = HudTextureId.NONE,
+    borderWidthDp: Float = 0f,
     resetEpoch: Int = 0,
     onVolumeScrub: (Float) -> Unit,
     onScrubStateChanged: (Boolean) -> Unit,
@@ -411,7 +415,9 @@ fun VolumeSliderHud(
     val housingPath = remember { Path() }
     val pillPath = remember { Path() }
     val speakerPath = remember { Path() }
-    val paletteSpec = remember(palette) { hudPaletteSpec(palette) }
+    val paletteSpec = remember(palette, colorIntensity) { hudPaletteSpec(palette, colorIntensity) }
+    val textureCellPx = with(density) { 3.dp.toPx() }
+    val textureBrush = remember(texture, textureCellPx) { createHudTextureBrush(texture, textureCellPx) }
     val gradientShift = remember { Animatable(0f) }
     val gradientAnimating = animateGradient && useGradient && isVisible && !paletteSpec.isClassic
     LaunchedEffect(gradientAnimating) {
@@ -718,6 +724,24 @@ fun VolumeSliderHud(
                             size = Size(pillW, pillBottom - fillTop)
                         )
                     }
+                    drawHudSurfaceFx(
+                        texture = texture,
+                        textureBrush = textureBrush,
+                        pillPath = pillPath,
+                        topLeft = Offset(pillLeft, pillTop),
+                        size = Size(pillW, pillSpan),
+                        borderPx = borderWidthDp.dp.toPx(),
+                        borderColor = HudBorderColor
+                    )
+                    drawHudSurfaceFx(
+                        texture = texture,
+                        textureBrush = textureBrush,
+                        pillPath = pillPath,
+                        topLeft = Offset(pillLeft, pillTop),
+                        size = Size(pillSpan, pillW),
+                        borderPx = borderWidthDp.dp.toPx(),
+                        borderColor = HudBorderColor
+                    )
                     val iconSize = (pillW * 0.45f).coerceIn(12.dp.toPx(), 20.dp.toPx())
                     val iconCenter = Offset(
                         x = pillCenterX,
